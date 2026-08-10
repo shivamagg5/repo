@@ -29,6 +29,7 @@ import { SupportModule } from './modules/support/support.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { DiscoveryModule } from './modules/discovery/discovery.module';
     DatabaseModule,
     AuditModule,  // Global — AuditService available everywhere
     DiscoveryModule,
+    IdempotencyModule,
 
     // Domain modules (business logic implemented per phase)
     AuthModule,

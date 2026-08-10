@@ -155,14 +155,47 @@ export const setEventLineupSchema = z.object({
 export const createTicketTypeSchema = z.object({
   eventId: uuidSchema,
   name: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(1000).optional().nullable(),
   priceMinor: z.number().int().nonnegative(),
   currency: z.string().length(3).default('INR'),
   quantity: z.number().int().positive(),
+  minPerOrder: z.number().int().positive().default(1),
   maxPerOrder: z.number().int().positive().default(10),
-  saleStartsAt: isoDateSchema.optional(),
-  saleEndsAt: isoDateSchema.optional(),
+  saleStartsAt: isoDateSchema.optional().nullable(),
+  saleEndsAt: isoDateSchema.optional().nullable(),
+  status: z.enum(['draft', 'active', 'paused', 'sold_out', 'closed']).default('active'),
+}).strict().refine((data) => data.maxPerOrder >= data.minPerOrder, {
+  message: 'maxPerOrder must be greater than or equal to minPerOrder',
+  path: ['maxPerOrder'],
 });
+
+export const updateTicketTypeSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  priceMinor: z.number().int().nonnegative().optional(),
+  quantity: z.number().int().positive().optional(),
+  minPerOrder: z.number().int().positive().optional(),
+  maxPerOrder: z.number().int().positive().optional(),
+  saleStartsAt: isoDateSchema.optional().nullable(),
+  saleEndsAt: isoDateSchema.optional().nullable(),
+  status: z.enum(['draft', 'active', 'paused', 'sold_out', 'closed']).optional(),
+}).strict();
+
+export const createReservationSchema = z.object({
+  ticketTypeId: uuidSchema,
+  quantity: z.number().int().positive(),
+  idempotencyKey: z.string().min(1).max(200).optional(),
+  // Strict check: reject if client attempts to pass price overrides
+}).strict();
+
+export const cancelReservationSchema = z.object({
+  reservationId: uuidSchema,
+}).strict();
+
+export const createOrderSchema = z.object({
+  reservationId: uuidSchema,
+  idempotencyKey: z.string().min(1).max(200).optional(),
+}).strict();
 
 // ---------------------------------------------------------------------------
 // Pagination & Public Discovery schemas

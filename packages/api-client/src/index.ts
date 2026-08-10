@@ -144,6 +144,47 @@ export class ApiClient {
   async getPublicCategories<T>(): Promise<ApiSuccess<T>> {
     return this.get<T>('/public/categories');
   }
+
+  // ---------------------------------------------------------------------------
+  // Ticketing Engine Methods
+  // ---------------------------------------------------------------------------
+  async createTicketType<T>(eventId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/events/${encodeURIComponent(eventId)}/ticket-types`, body);
+  }
+
+  async updateTicketType<T>(ticketTypeId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>(`/ticket-types/${encodeURIComponent(ticketTypeId)}`, body);
+  }
+
+  async getEventTicketTypes<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/events/${encodeURIComponent(eventId)}/ticket-types`);
+  }
+
+  async createReservation<T>(body: unknown, idempotencyKey?: string): Promise<ApiSuccess<T>> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+    return this.post<T>('/reservations', body);
+  }
+
+  async getReservation<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/reservations/${encodeURIComponent(id)}`);
+  }
+
+  async cancelReservation<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/reservations/${encodeURIComponent(id)}/cancel`);
+  }
+
+  async createOrder<T>(body: unknown, idempotencyKey?: string): Promise<ApiSuccess<T>> {
+    return this.post<T>('/orders', body);
+  }
+
+  async getOrder<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/orders/${encodeURIComponent(id)}`);
+  }
+
+  async getUserTickets<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/tickets');
+  }
 }
 
 /**

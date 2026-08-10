@@ -11,6 +11,9 @@ export type AuditCategory =
   | 'membership'    // member.invited, member.accepted, member.removed, member.role_changed
   | 'role'          // role.assigned, role.changed, role.removed
   | 'admin'         // admin.user_suspended, admin.user_restored, admin.role_changed
+  | 'inventory'     // inventory.hold_created, inventory.hold_released, inventory.hold_expired
+  | 'order'         // order.created, order.confirmed, order.cancelled
+  | 'ticket'        // ticket.issued, ticket.cancelled
   | 'security';     // security.escalation_attempt, security.invalid_token, security.invalid_invitation
 
 // ---------------------------------------------------------------------------

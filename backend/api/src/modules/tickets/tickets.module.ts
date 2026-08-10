@@ -1,26 +1,16 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { TicketTypesController } from './ticket-types.controller';
+import { TicketsController } from './tickets.controller';
+import { TicketTypesService } from './ticket-types.service';
+import { TicketsService } from './tickets.service';
+import { TicketIssuanceService } from './ticket-issuance.service';
+import { AuthModule } from '../auth/auth.module';
+import { AuditModule } from '../../common/audit/audit.module';
 
-/**
- * Tickets Module
- * 
- * Domain: tickets
- * Status: Scaffolded (Task 0.1) — business logic implemented in later phases.
- * 
- * Phase schedule:
- * - Auth/Users/Orgs: Task 1.1
- * - Venues/Events: Task 2.x
- * - Tickets/Orders: Task 4.x
- * - Payments/Refunds: Task 5.x
- * - Scanner: Task 7.x
- * - Finance/Settlements: Task 9.x / 10.x
- * - Promoters/Commissions: Task 10.x
- * - Notifications/CMS: Task 11.x
- * - Analytics: Task 12.x
- * - Support/Moderation/Admin: Task 8.x / 9.x
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [AuthModule, AuditModule],
+  controllers: [TicketTypesController, TicketsController],
+  providers: [TicketTypesService, TicketsService, TicketIssuanceService],
+  exports: [TicketTypesService, TicketsService, TicketIssuanceService],
 })
 export class TicketsModule {}

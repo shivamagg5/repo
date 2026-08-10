@@ -30,6 +30,7 @@ export type OrderStatus =
   | 'completed'
   | 'payment_failed'
   | 'cancelled'
+  | 'expired'
   | 'refund_pending'
   | 'partially_refunded'
   | 'refunded';

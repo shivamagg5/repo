@@ -14,6 +14,7 @@ import {
   timestamp,
   numeric,
   char,
+  json,
   unique,
   primaryKey,
   index,
@@ -36,7 +37,7 @@ export const ticketStatusEnum = pgEnum('ticket_status', [
 ]);
 export const orderStatusEnum = pgEnum('order_status', [
   'created', 'payment_pending', 'paid', 'tickets_issued', 'completed',
-  'payment_failed', 'cancelled', 'refund_pending', 'partially_refunded', 'refunded',
+  'payment_failed', 'cancelled', 'expired', 'refund_pending', 'partially_refunded', 'refunded',
 ]);
 export const paymentStatusEnum = pgEnum('payment_status', [
   'pending', 'authorized', 'paid', 'failed', 'cancelled', 'refunded', 'partially_refunded',
@@ -232,6 +233,7 @@ export const ticketTypes = pgTable('ticket_types', {
   quantity: integer('quantity').notNull(),
   soldQuantity: integer('sold_quantity').notNull().default(0),
   reservedQuantity: integer('reserved_quantity').notNull().default(0),
+  minPerOrder: integer('min_per_order').notNull().default(1),
   maxPerOrder: integer('max_per_order').notNull().default(10),
   saleStartsAt: timestamp('sale_starts_at', { withTimezone: true }),
   saleEndsAt: timestamp('sale_ends_at', { withTimezone: true }),
@@ -269,11 +271,25 @@ export const inventoryReservations = pgTable('inventory_reservations', {
   id: uuid('id').primaryKey().defaultRandom(),
   ticketTypeId: uuid('ticket_type_id').notNull().references(() => ticketTypes.id, { onDelete: 'restrict' }),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'restrict' }),
   quantity: integer('quantity').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   status: text('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const idempotencyRecords = pgTable('idempotency_records', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  requestPath: text('request_path').notNull(),
+  requestHash: text('request_hash').notNull(),
+  responseStatus: integer('response_status').notNull(),
+  responseBody: json('response_body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  ukIdempotencyKeyUser: unique('uk_idempotency_key_user').on(t.idempotencyKey, t.userId),
+}));
 
 export const tickets = pgTable('tickets', {
   id: uuid('id').primaryKey().defaultRandom(),
