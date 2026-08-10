@@ -29,6 +29,8 @@ import { SupportModule } from './modules/support/support.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { OrganizerDashboardModule } from './modules/organizer/organizer-dashboard.module';
+import { VenueDashboardModule } from './modules/venue/venue-dashboard.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 
 @Module({
@@ -83,6 +85,8 @@ import { IdempotencyModule } from './common/idempotency/idempotency.module';
     SupportModule,
     ModerationModule,
     AdminModule,
+    OrganizerDashboardModule,
+    VenueDashboardModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -64,6 +64,12 @@ export const createOrganizationSchema = z.object({
   logoUrl: urlSchema.optional(),
 });
 
+export const inviteMemberSchema = z.object({
+  email: emailSchema,
+  roleId: uuidSchema.optional(),
+  roleName: z.string().optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Domain schemas — Venues
 // ---------------------------------------------------------------------------

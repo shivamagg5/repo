@@ -225,6 +225,62 @@ export class ApiClient {
   async recordReferralClick<T>(body: unknown): Promise<ApiSuccess<T>> {
     return this.post<T>('/public/referrals/click', body);
   }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Dashboard Methods
+  // ---------------------------------------------------------------------------
+  async getOrganizerOverview<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/overview');
+  }
+
+  async getOrganizerEvents<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return this.get<T>(`/organizer/events${query}`);
+  }
+
+  async getOrganizerEventDashboard<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/organizer/events/${encodeURIComponent(eventId)}/dashboard`);
+  }
+
+  async getOrganizerEventOrders<T>(eventId: string, params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return this.get<T>(`/organizer/events/${encodeURIComponent(eventId)}/orders${query}`);
+  }
+
+  async getOrganizerEventAttendance<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/organizer/events/${encodeURIComponent(eventId)}/attendance`);
+  }
+
+  async getOrganizerEventPromoters<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/organizer/events/${encodeURIComponent(eventId)}/promoters`);
+  }
+
+  async getOrganizerTeam<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/team');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Venue Dashboard Methods
+  // ---------------------------------------------------------------------------
+  async getVenueProfile<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/venue/profile');
+  }
+
+  async updateVenueProfile<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>('/venue/profile', body);
+  }
+
+  async getVenueCalendar<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/venue/calendar');
+  }
+
+  async getVenueEvents<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/venue/events');
+  }
+
+  async getVenueStaff<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/venue/staff');
+  }
 }
 
 /**
