@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
-import { getSupabaseClient } from '../lib/supabase';
+import { getSupabaseClient } from '../../lib/supabase';
 import { onAuthStateChange, signOut, getAuthorizationHeader } from '@platform/auth';
 
 interface AuthContextValue {

@@ -9,5 +9,4 @@ export { Card, type CardProps } from './components/Card.js';
 export { Input, type InputProps } from './components/Input.js';
 export { Skeleton, type SkeletonProps } from './components/Skeleton.js';
 export { EmptyState, type EmptyStateProps } from './components/EmptyState.js';
-export { ErrorState, type ErrorStateProps } from './components/ErrorState.js';
 export { Spinner } from './components/Spinner.js';
