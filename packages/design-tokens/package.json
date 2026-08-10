@@ -1,0 +1,28 @@
+{
+  "name": "@platform/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared design tokens — colors, typography, spacing, radius, breakpoints",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./css": "./dist/tokens.css"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json && node --input-type=module < scripts/build-css.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "node --test dist/index.test.js",
+    "test:unit": "pnpm test",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0",
+    "typescript": "^5.5.0"
+  }
+}

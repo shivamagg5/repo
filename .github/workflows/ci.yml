@@ -1,0 +1,270 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.13.1'
+  FLUTTER_VERSION: '3.41.6'
+
+jobs:
+  # ============================================================================
+  # Lint & Typecheck — Node.js packages
+  # ============================================================================
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Approve builds
+        run: echo '{"@nestjs/core": true, "esbuild": true}' > .pnpm-approve-builds.json || true
+        
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck (shared packages)
+        run: |
+          pnpm --filter @platform/types typecheck
+          pnpm --filter @platform/validation typecheck
+          pnpm --filter @platform/config typecheck
+
+  # ============================================================================
+  # Test — Node.js unit tests
+  # ============================================================================
+  test-node:
+    name: Test — Node.js
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    env:
+      NODE_ENV: test
+      DATABASE_URL: ''
+      SUPABASE_URL: ''
+      SUPABASE_ANON_KEY: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+      REDIS_URL: redis://localhost:6379
+      PORT: '3001'
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @platform/types build
+          pnpm --filter @platform/validation build
+          pnpm --filter @platform/config build
+
+      - name: Test — @platform/validation
+        run: pnpm --filter @platform/validation test
+
+      - name: Test — NestJS backend unit tests
+        run: pnpm --filter @platform/api test
+
+  # ============================================================================
+  # Build — NestJS backend
+  # ============================================================================
+  build-backend:
+    name: Build — Backend
+    runs-on: ubuntu-latest
+    needs: test-node
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @platform/types build
+          pnpm --filter @platform/validation build
+          pnpm --filter @platform/config build
+          pnpm --filter @platform/api-client build
+          pnpm --filter @platform/auth build
+
+      - name: Build backend
+        run: pnpm --filter @platform/api build
+
+      - name: Verify build artifact
+        run: test -f backend/api/dist/main.js
+
+  # ============================================================================
+  # Build — Web apps (consumer only in foundation phase)
+  # ============================================================================
+  build-web:
+    name: Build — Web Apps
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    strategy:
+      matrix:
+        app: [consumer-web, organizer-web, venue-web, promoter-web, admin-web]
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
+      NEXT_PUBLIC_API_URL: 'http://localhost:3001'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @platform/types build
+          pnpm --filter @platform/validation build
+          pnpm --filter @platform/config build
+          pnpm --filter @platform/api-client build
+          pnpm --filter @platform/auth build
+
+      - name: Build ${{ matrix.app }}
+        run: pnpm --filter ${{ matrix.app }} build
+
+  # ============================================================================
+  # Flutter analyze — Consumer mobile
+  # ============================================================================
+  analyze-flutter:
+    name: Analyze — Flutter Apps
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [consumer-mobile, scanner-mobile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter pub get — ${{ matrix.app }}
+        run: flutter pub get
+        working-directory: apps/${{ matrix.app }}
+
+      - name: Flutter analyze — ${{ matrix.app }}
+        run: flutter analyze
+        working-directory: apps/${{ matrix.app }}
+
+      - name: Flutter test — ${{ matrix.app }}
+        run: flutter test
+        working-directory: apps/${{ matrix.app }}
+
+  # ============================================================================
+  # Security — Audit Node.js dependencies
+  # ============================================================================
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit for high/critical vulnerabilities
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+  # ============================================================================
+  # Summary gate — all required jobs must pass
+  # ============================================================================
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs:
+      - lint-typecheck
+      - test-node
+      - build-backend
+      - analyze-flutter
+    if: always()
+    steps:
+      - name: Check all required jobs passed
+        run: |
+          if [ "${{ needs.lint-typecheck.result }}" != "success" ]; then exit 1; fi
+          if [ "${{ needs.test-node.result }}" != "success" ]; then exit 1; fi
+          if [ "${{ needs.build-backend.result }}" != "success" ]; then exit 1; fi
+          if [ "${{ needs.analyze-flutter.result }}" != "success" ]; then exit 1; fi
+          echo "All CI checks passed."

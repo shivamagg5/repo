@@ -1,0 +1,30 @@
+{
+  "name": "@platform/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed HTTP API client for the event platform backend",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "node --test dist/index.test.js",
+    "test:unit": "pnpm test",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@platform/types": "workspace:*"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0",
+    "typescript": "^5.5.0"
+  }
+}

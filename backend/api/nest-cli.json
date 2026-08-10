@@ -1,0 +1,14 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "entryFile": "main",
+  "language": "ts",
+  "generateOptions": {
+    "spec": true
+  },
+  "compilerOptions": {
+    "plugins": [],
+    "assets": [],
+    "watchAssets": false
+  }
+}

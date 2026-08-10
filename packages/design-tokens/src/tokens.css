@@ -1,0 +1,133 @@
+/* =============================================================================
+   @platform/design-tokens — CSS Custom Properties
+   Import this in your web application's root CSS file.
+   ============================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* --- Brand Colors --- */
+  --color-brand: hsl(258, 90%, 60%);
+  --color-brand-strong: hsl(258, 90%, 48%);
+  --color-brand-subtle: hsl(258, 90%, 95%);
+
+  /* --- Backgrounds --- */
+  --color-background: hsl(220, 20%, 8%);
+  --color-surface: hsl(220, 16%, 12%);
+  --color-surface-elevated: hsl(220, 14%, 16%);
+  --color-surface-hover: hsl(220, 14%, 20%);
+
+  /* --- Text --- */
+  --color-text-primary: hsl(220, 20%, 96%);
+  --color-text-secondary: hsl(220, 10%, 65%);
+  --color-text-muted: hsl(220, 8%, 45%);
+  --color-text-inverse: hsl(220, 20%, 8%);
+
+  /* --- Borders --- */
+  --color-border: hsl(220, 14%, 22%);
+  --color-border-strong: hsl(220, 14%, 32%);
+
+  /* --- Semantic States --- */
+  --color-success: hsl(152, 70%, 48%);
+  --color-success-subtle: hsl(152, 70%, 12%);
+  --color-warning: hsl(38, 90%, 52%);
+  --color-warning-subtle: hsl(38, 90%, 12%);
+  --color-danger: hsl(0, 75%, 58%);
+  --color-danger-subtle: hsl(0, 75%, 12%);
+  --color-info: hsl(210, 85%, 58%);
+  --color-info-subtle: hsl(210, 85%, 12%);
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-display: 56px;
+  --text-h1: 40px;
+  --text-h2: 32px;
+  --text-h3: 24px;
+  --text-body-large: 18px;
+  --text-body: 16px;
+  --text-body-small: 14px;
+  --text-caption: 12px;
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* --- Radius --- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-brand: 0 4px 24px hsl(258 90% 60% / 0.3);
+  --shadow-glow: 0 0 40px hsl(258 90% 60% / 0.2);
+
+  /* --- Transitions --- */
+  --transition-fast: 120ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-slow: 320ms ease-out;
+  --transition-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- Z-Index --- */
+  --z-base: 0;
+  --z-elevated: 10;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+  --z-tooltip: 500;
+}
+
+/* Light mode overrides (optional — currently dark-first) */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="light"] {
+    --color-background: hsl(0, 0%, 100%);
+    --color-surface: hsl(220, 14%, 97%);
+    --color-surface-elevated: hsl(220, 14%, 94%);
+    --color-text-primary: hsl(220, 20%, 8%);
+    --color-text-secondary: hsl(220, 10%, 35%);
+    --color-text-muted: hsl(220, 8%, 55%);
+    --color-border: hsl(220, 14%, 88%);
+    --color-border-strong: hsl(220, 14%, 78%);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-normal: 0ms;
+    --transition-slow: 0ms;
+    --transition-spring: 0ms;
+  }
+}
+
+/* Global reset and base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
