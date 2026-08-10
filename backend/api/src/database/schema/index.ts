@@ -418,7 +418,12 @@ export const commissionEntries = pgTable('commission_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
   campaignId: uuid('campaign_id').notNull().references(() => promoterCampaigns.id, { onDelete: 'restrict' }),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
+  commissionType: text('commission_type'),
+  commissionValue: numeric('commission_value', { precision: 12, scale: 4 }),
+  calculationBaseMinor: bigint('calculation_base_minor', { mode: 'number' }),
+  ticketQuantity: integer('ticket_quantity').default(1),
   amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(),
+  currency: char('currency', { length: 3 }).notNull().default('INR'),
   status: text('status').notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

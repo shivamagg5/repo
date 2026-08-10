@@ -198,6 +198,33 @@ export class ApiClient {
   async getPaymentTransaction<T>(id: string): Promise<ApiSuccess<T>> {
     return this.get<T>(`/payments/${encodeURIComponent(id)}`);
   }
+
+  // ---------------------------------------------------------------------------
+  // Promoter Engine Methods
+  // ---------------------------------------------------------------------------
+  async createPromoterCampaign<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/promoter/campaigns', body);
+  }
+
+  async getPromoterCampaigns<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/promoter/campaigns');
+  }
+
+  async getPromoterCampaignById<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/promoter/campaigns/${encodeURIComponent(id)}`);
+  }
+
+  async getPromoterCampaignPerformance<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/promoter/campaigns/${encodeURIComponent(id)}/performance`);
+  }
+
+  async getPromoterEarnings<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/promoter/earnings');
+  }
+
+  async recordReferralClick<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/public/referrals/click', body);
+  }
 }
 
 /**

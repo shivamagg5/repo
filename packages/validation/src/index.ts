@@ -203,6 +203,23 @@ export const createPaymentIntentSchema = z.object({
   provider: z.string().min(1).max(50).default('razorpay'),
 }).strict();
 
+export const createPromoterCampaignSchema = z.object({
+  eventId: uuidSchema,
+  code: z.string().min(2).max(50).regex(/^[a-zA-Z0-9_-]+$/, { message: 'Code must be alphanumeric.' }),
+  commissionType: z.enum(['percentage', 'fixed']),
+  commissionValue: z.number().positive(),
+}).strict();
+
+export const recordReferralClickSchema = z.object({
+  code: z.string().min(2).max(50),
+  sessionReference: z.string().max(250).optional(),
+}).strict();
+
+export const attributeOrderSchema = z.object({
+  orderId: uuidSchema,
+  code: z.string().min(2).max(50),
+}).strict();
+
 // ---------------------------------------------------------------------------
 // Pagination & Public Discovery schemas
 // ---------------------------------------------------------------------------

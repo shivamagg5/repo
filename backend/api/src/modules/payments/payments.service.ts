@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
   UnauthorizedException,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
@@ -23,6 +24,7 @@ import { PaymentTransactionStateMachineService } from './payment-transaction-sta
 import { OrderStateMachineService } from '../orders/order-state-machine.service';
 import { HoldStateMachineService } from '../inventory/hold-state-machine.service';
 import { TicketIssuanceService } from '../tickets/ticket-issuance.service';
+import { CommissionService } from '../promoters/commission.service';
 import { AuditService } from '../../common/audit/audit.service';
 import type {
   AuthContext,
@@ -44,6 +46,7 @@ export class PaymentsService {
     private readonly holdStateMachine: HoldStateMachineService,
     private readonly ticketIssuance: TicketIssuanceService,
     private readonly audit: AuditService,
+    @Optional() private readonly commissionService?: CommissionService,
   ) {}
 
   /**
@@ -345,6 +348,11 @@ export class PaymentsService {
 
       // Issue tickets
       await this.ticketIssuance.issueTicketsForOrder(tx, order.id);
+
+      // Calculate & record promoter commission if attributed
+      if (this.commissionService) {
+        await this.commissionService.calculateAndRecordCommission(tx, order.id);
+      }
 
       this.audit.log({
         actorUserId: order.userId,
