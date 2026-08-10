@@ -4,6 +4,7 @@ export interface PaymentTransaction {
   id: string;
   orderId: string;
   provider: string;
+  providerOrderId: string | null;
   providerPaymentId: string | null;
   amountMinor: number;
   currency: string;
@@ -11,6 +12,23 @@ export interface PaymentTransaction {
   providerPayloadReference: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreatePaymentIntentInput {
+  orderId: string;
+  idempotencyKey?: string;
+  provider?: string;
+}
+
+export interface PaymentIntentDto {
+  paymentTransactionId: string;
+  orderId: string;
+  provider: string;
+  providerOrderId: string;
+  amountMinor: number;
+  currency: string;
+  status: PaymentStatus;
+  checkoutPayload: Record<string, unknown>;
 }
 
 export interface PaymentEvent {

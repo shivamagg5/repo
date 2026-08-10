@@ -313,6 +313,7 @@ export const paymentTransactions = pgTable('payment_transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
   provider: text('provider').notNull(),
+  providerOrderId: text('provider_order_id'),
   providerPaymentId: text('provider_payment_id').unique(),
   amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(),
   currency: char('currency', { length: 3 }).notNull().default('INR'),

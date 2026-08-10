@@ -14,6 +14,7 @@ export type AuditCategory =
   | 'inventory'     // inventory.hold_created, inventory.hold_released, inventory.hold_expired
   | 'order'         // order.created, order.confirmed, order.cancelled
   | 'ticket'        // ticket.issued, ticket.cancelled
+  | 'payment'       // payment.intent_created, payment.success_confirmed, payment.late_payment_flagged_for_refund
   | 'security';     // security.escalation_attempt, security.invalid_token, security.invalid_invitation
 
 // ---------------------------------------------------------------------------

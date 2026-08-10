@@ -185,6 +185,19 @@ export class ApiClient {
   async getUserTickets<T>(): Promise<ApiSuccess<T>> {
     return this.get<T>('/tickets');
   }
+
+  // ---------------------------------------------------------------------------
+  // Payment Methods
+  // ---------------------------------------------------------------------------
+  async createPaymentIntent<T>(body: unknown, idempotencyKey?: string): Promise<ApiSuccess<T>> {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+    return this.post<T>('/payments/intent', body);
+  }
+
+  async getPaymentTransaction<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/payments/${encodeURIComponent(id)}`);
+  }
 }
 
 /**

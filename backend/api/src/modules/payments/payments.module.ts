@@ -1,26 +1,26 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { PaymentsController } from './payments.controller';
+import { PaymentsService } from './payments.service';
+import { RazorpayPaymentGateway } from './gateways/razorpay-payment.gateway';
+import { MockPaymentGateway } from './gateways/mock-payment.gateway';
+import { PaymentTransactionStateMachineService } from './payment-transaction-state-machine.service';
+import { AuthModule } from '../auth/auth.module';
+import { AuditModule } from '../../common/audit/audit.module';
+import { InventoryModule } from '../inventory/inventory.module';
+import { OrdersModule } from '../orders/orders.module';
+import { TicketsModule } from '../tickets/tickets.module';
 
-/**
- * Payments Module
- * 
- * Domain: payments
- * Status: Scaffolded (Task 0.1) — business logic implemented in later phases.
- * 
- * Phase schedule:
- * - Auth/Users/Orgs: Task 1.1
- * - Venues/Events: Task 2.x
- * - Tickets/Orders: Task 4.x
- * - Payments/Refunds: Task 5.x
- * - Scanner: Task 7.x
- * - Finance/Settlements: Task 9.x / 10.x
- * - Promoters/Commissions: Task 10.x
- * - Notifications/CMS: Task 11.x
- * - Analytics: Task 12.x
- * - Support/Moderation/Admin: Task 8.x / 9.x
- */
+import { ConfigModule } from '@nestjs/config';
+
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [ConfigModule, AuthModule, AuditModule, InventoryModule, OrdersModule, TicketsModule],
+  controllers: [PaymentsController],
+  providers: [
+    PaymentsService,
+    RazorpayPaymentGateway,
+    MockPaymentGateway,
+    PaymentTransactionStateMachineService,
+  ],
+  exports: [PaymentsService, RazorpayPaymentGateway, MockPaymentGateway, PaymentTransactionStateMachineService],
 })
 export class PaymentsModule {}

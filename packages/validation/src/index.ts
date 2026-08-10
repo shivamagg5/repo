@@ -197,6 +197,12 @@ export const createOrderSchema = z.object({
   idempotencyKey: z.string().min(1).max(200).optional(),
 }).strict();
 
+export const createPaymentIntentSchema = z.object({
+  orderId: uuidSchema,
+  idempotencyKey: z.string().min(1).max(200).optional(),
+  provider: z.string().min(1).max(50).default('razorpay'),
+}).strict();
+
 // ---------------------------------------------------------------------------
 // Pagination & Public Discovery schemas
 // ---------------------------------------------------------------------------
