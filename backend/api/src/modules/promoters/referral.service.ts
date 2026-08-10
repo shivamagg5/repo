@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -63,11 +64,37 @@ export class ReferralService {
   ): Promise<{ attributionId: string; campaignId: string }> {
     const normalizedCode = referralCode.trim().toUpperCase();
 
-    // 1. Fetch order
+    // 1. Fetch order & verify purchaser ownership
     const order = await this.db.db.query.orders.findFirst({ where: eq(orders.id, orderId) });
     if (!order) throw new NotFoundException({ code: 'ORDER_NOT_FOUND', message: 'Order not found.' });
 
-    // 2. Fetch campaign
+    if (order.userId !== purchaserUserId) {
+      throw new ForbiddenException({
+        code: 'ATTRIBUTION_USER_MISMATCH',
+        message: 'Cannot attribute an order belonging to another purchaser.',
+      });
+    }
+
+    // 2. Pre-payment Window Check (Attribution is STRICTLY IMMUTABLE once PAID)
+    if (!['created', 'payment_pending'].includes(order.status)) {
+      throw new BadRequestException({
+        code: 'ATTRIBUTION_WINDOW_EXPIRED',
+        message: `Cannot attach or modify attribution for order in state '${order.status}'. Attribution is immutable post-payment.`,
+      });
+    }
+
+    // 3. Existing Attribution Check
+    const existingAttr = await this.db.db.query.referralAttributions.findFirst({
+      where: eq(referralAttributions.orderId, orderId),
+    });
+    if (existingAttr) {
+      throw new ConflictException({
+        code: 'ORDER_ALREADY_ATTRIBUTED',
+        message: 'Order has already been attributed to a promoter campaign and cannot be modified.',
+      });
+    }
+
+    // 4. Fetch campaign
     const campaign = await this.db.db.query.promoterCampaigns.findFirst({
       where: and(
         eq(promoterCampaigns.eventId, order.eventId),

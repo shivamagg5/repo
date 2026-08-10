@@ -70,17 +70,23 @@ export class CommissionService {
     let totalTicketQuantity = 0;
     for (const item of items) totalTicketQuantity += item.quantity;
 
-    // 4. Server-Authoritative Integer Minor Unit Calculation
+    // 4. Server-Authoritative BigInt Integer Minor Unit Calculation
     const calculationBaseMinor = Number(order.subtotalMinor);
     const commValue = Number(campaign.commissionValue);
     let amountMinor = 0;
 
     if (campaign.commissionType === 'percentage') {
-      // Percentage calculation: (subtotal * percentage) / 100
-      amountMinor = Math.round((calculationBaseMinor * commValue) / 100);
+      // BigInt basis points integer arithmetic (1% = 100 basis points)
+      const basisPoints = BigInt(Math.round(commValue * 100));
+      const baseBigInt = BigInt(calculationBaseMinor);
+      // Integer division rounding half-up: (base * basisPoints + 5000n) / 10000n
+      const calcBigInt = (baseBigInt * basisPoints + 5000n) / 10000n;
+      amountMinor = Number(calcBigInt);
     } else if (campaign.commissionType === 'fixed') {
-      // Fixed amount calculation per ticket in minor units
-      amountMinor = Math.round(commValue * totalTicketQuantity);
+      // Fixed amount calculation per ticket in integer minor units
+      const fixedMinorBigInt = BigInt(Math.round(commValue));
+      const qtyBigInt = BigInt(totalTicketQuantity);
+      amountMinor = Number(fixedMinorBigInt * qtyBigInt);
     }
 
     if (amountMinor < 0) amountMinor = 0;
@@ -143,20 +149,29 @@ export class CommissionService {
           .where(eq(commissionEntries.id, entry.id));
       }
     } else {
-      // PROPORTIONAL PARTIAL REFUND REVERSAL
+      // PROPORTIONAL PARTIAL REFUND REVERSAL (Preserves original historical entry intact!)
       const originalBase = Number(entry.calculationBaseMinor ?? 0);
-      if (originalBase > 0 && entry.commissionType === 'percentage') {
-        const remainingBase = Math.max(0, originalBase - refundedAmountMinor);
-        const commValue = Number(entry.commissionValue ?? 0);
-        const newAmountMinor = Math.round((remainingBase * commValue) / 100);
+      const originalAmount = Number(entry.amountMinor ?? 0);
 
-        await tx
-          .update(commissionEntries)
-          .set({
-            calculationBaseMinor: remainingBase,
-            amountMinor: newAmountMinor,
-          })
-          .where(eq(commissionEntries.id, entry.id));
+      if (originalBase > 0 && entry.commissionType === 'percentage') {
+        const commValue = Number(entry.commissionValue ?? 0);
+        // Calculate reversal amount in minor units
+        const reversalAmountMinor = Math.round((refundedAmountMinor * commValue) / 100);
+
+        if (reversalAmountMinor > 0) {
+          // Insert explicit reversal entry record
+          await tx.insert(commissionEntries).values({
+            campaignId: entry.campaignId,
+            orderId: entry.orderId,
+            commissionType: entry.commissionType,
+            commissionValue: entry.commissionValue,
+            calculationBaseMinor: refundedAmountMinor,
+            ticketQuantity: entry.ticketQuantity,
+            amountMinor: -reversalAmountMinor, // Negative adjustment value
+            currency: entry.currency,
+            status: 'reversed',
+          });
+        }
       }
     }
 
