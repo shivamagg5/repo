@@ -5,7 +5,7 @@
   "description": "Event discovery, ticketing, and operations ecosystem",
   "packageManager": "pnpm@10.13.1",
   "engines": {
-    "node": ">=22.0.0",
+    "node": "22.x",
     "pnpm": ">=10.0.0"
   },
   "scripts": {

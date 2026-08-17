@@ -4,10 +4,12 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/config build && pnpm --filter @platform/api build
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/config build && pnpm --filter @platform/api build
     startCommand: node backend/api/dist/main
     healthCheckPath: /api/v1/health
     envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
       - key: NODE_ENV
         value: production
       - key: PORT
