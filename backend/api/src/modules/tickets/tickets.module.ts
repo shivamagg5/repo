@@ -6,9 +6,10 @@ import { TicketsService } from './tickets.service';
 import { TicketIssuanceService } from './ticket-issuance.service';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../../common/audit/audit.module';
+import { ScannerModule } from '../scanner/scanner.module';
 
 @Module({
-  imports: [AuthModule, AuditModule],
+  imports: [AuthModule, AuditModule, ScannerModule],
   controllers: [TicketTypesController, TicketsController],
   providers: [TicketTypesService, TicketsService, TicketIssuanceService],
   exports: [TicketTypesService, TicketsService, TicketIssuanceService],

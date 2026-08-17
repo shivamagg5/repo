@@ -260,5 +260,180 @@ export const publicDiscoveryQuerySchema = z.object({
   timezone: z.string().max(50).optional().default('Asia/Kolkata'),
 });
 
+// ---------------------------------------------------------------------------
+// Scanner Domain Validation Schemas (Task 9.1)
+// ---------------------------------------------------------------------------
+export const deviceRegisterSchema = z.object({
+  deviceIdentifier: z.string().min(3).max(100),
+  publicKeyPem: z.string().min(30),
+  deviceModel: z.string().max(100).optional(),
+});
+
+export const devicePairSchema = z.object({
+  deviceId: uuidSchema,
+  eventId: uuidSchema,
+  gateId: uuidSchema,
+});
+
+export const scanTicketSchema = z.object({
+  qrPayload: z.string().min(10),
+  eventId: uuidSchema,
+  gateId: uuidSchema,
+  deviceId: uuidSchema,
+  scanTimestamp: z.string().optional(),
+});
+
+export const batchSyncScanRecordSchema = z.object({
+  syncId: uuidSchema,
+  qrPayload: z.string().min(10),
+  eventId: uuidSchema,
+  gateId: uuidSchema,
+  deviceId: uuidSchema,
+  deviceScannedAt: z.string(),
+  localVerificationResult: z.string(),
+});
+
+export const batchSyncScansSchema = z.object({
+  deviceId: uuidSchema,
+  eventId: uuidSchema,
+  records: z.array(batchSyncScanRecordSchema).min(1).max(500),
+});
+
+export const attendeeSearchQuerySchema = z.object({
+  eventId: uuidSchema,
+  query: z.string().min(2).max(100),
+});
+
+// ---------------------------------------------------------------------------
+// Admin Domain Schemas
+// ---------------------------------------------------------------------------
+export const adminUserSuspendSchema = z.object({
+  reason: z.string().min(5).max(500),
+});
+
+export const adminEventReviewSchema = z.object({
+  action: z.enum(['approve', 'reject', 'suspend']),
+  reason: z.string().max(500).optional(),
+});
+
+export const adminRefundOrderSchema = z.object({
+  reason: z.string().min(5).max(500),
+  idempotencyKey: z.string().min(5).max(100),
+  amountMinor: z.number().int().positive().optional(),
+});
+
+export const adminAuditLogQuerySchema = z.object({
+  adminUserId: uuidSchema.optional(),
+  action: z.string().optional(),
+  entityType: z.string().optional(),
+  entityId: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.number().int().positive().max(100).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Finance & Settlement Domain Schemas (Phase 10)
+// ---------------------------------------------------------------------------
+export const generateSettlementSchema = z.object({
+  organizationId: uuidSchema,
+  eventId: uuidSchema.optional(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  idempotencyKey: z.string().min(5).max(100),
+});
+
+export const reviewSettlementSchema = z.object({
+  action: z.enum(['approve', 'reject']),
+  reason: z.string().max(500).optional(),
+});
+
+export const runReconciliationSchema = z.object({
+  date: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Notifications & CMS Domain Schemas (Phase 11)
+// ---------------------------------------------------------------------------
+export const registerDeviceTokenSchema = z.object({
+  deviceId: z.string().min(3),
+  token: z.string().min(5),
+  platform: z.enum(['ios', 'android', 'web']),
+});
+
+export const updateNotificationPreferencesSchema = z.object({
+  preferences: z.array(
+    z.object({
+      channel: z.enum(['push', 'email', 'sms', 'in_app']),
+      category: z.enum(['transactional', 'marketing', 'reminders']),
+      enabled: z.boolean(),
+    }),
+  ),
+});
+
+export const createCmsBannerSchema = z.object({
+  title: z.string().min(3).max(200),
+  imageUrl: z.string().url(),
+  targetUrl: z.string().url(),
+  displayOrder: z.number().int().optional(),
+  status: z.enum(['draft', 'scheduled', 'published', 'archived']).optional(),
+  startAt: z.string().optional(),
+  endAt: z.string().optional(),
+});
+
+export const createCmsCollectionSchema = z.object({
+  title: z.string().min(3).max(200),
+  slug: z.string().min(3).max(200),
+  description: z.string().optional(),
+  coverImageUrl: z.string().url().optional(),
+  eventIds: z.array(uuidSchema).optional(),
+  status: z.enum(['draft', 'scheduled', 'published', 'archived']).optional(),
+});
+
+export const createCmsEditorialBlockSchema = z.object({
+  blockType: z.string().min(3),
+  headline: z.string().min(3).max(300),
+  bodyMarkdown: z.string(),
+  mediaUrl: z.string().url().optional(),
+  displayOrder: z.number().int().optional(),
+  status: z.enum(['draft', 'scheduled', 'published', 'archived']).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Analytics & Funnels Domain Schemas (Phase 12)
+// ---------------------------------------------------------------------------
+export const recordAnalyticsEventSchema = z.object({
+  clientEventId: z.string().optional(),
+  eventName: z.string().min(2).max(100),
+  eventId: uuidSchema.optional(),
+  sessionId: z.string().optional(),
+  platform: z.enum(['web', 'ios', 'android', 'admin']).optional(),
+  appVersion: z.string().optional(),
+  occurredAt: z.string().optional(),
+  properties: z.record(z.any()).optional(),
+});
+
+export const recordAnalyticsBatchSchema = z.object({
+  events: z.array(recordAnalyticsEventSchema).min(1).max(50),
+});
+
+export const funnelQuerySchema = z.object({
+  eventId: uuidSchema.optional(),
+  periodStart: z.string().optional(),
+  periodEnd: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Security & Scale Hardening Domain Schemas (Phase 13)
+// ---------------------------------------------------------------------------
+export const mfaVerifySchema = z.object({
+  mfaToken: z.string().min(6).max(10),
+});
+
+export const reauthInputSchema = z.object({
+  password: z.string().optional(),
+  mfaCode: z.string().optional(),
+});
+
 // Re-export zod for convenience
 export { z };
+

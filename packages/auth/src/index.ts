@@ -177,19 +177,28 @@ export async function getSessionToken(client: SupabaseClient): Promise<string | 
 }
 
 /**
- * Parse a Supabase JWT payload without verifying the signature.
- * IMPORTANT: For UI display purposes ONLY.
- * All authorization decisions must be made server-side.
+ * Re-authenticate with password to refresh the session authentication timestamp.
+ * Used for sensitive/privileged operation challenges (e.g. Phase 13 MfaGuard).
  */
-export function parseJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3 || !parts[1]) return null;
-    const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(payload) as Record<string, unknown>;
-  } catch {
-    return null;
+export async function reauthenticateWithPassword(
+  client: SupabaseClient,
+  password: string,
+): Promise<AuthResult> {
+  const user = await getCurrentUser(client);
+  if (!user?.email) {
+    return {
+      user: null,
+      session: null,
+      error: 'No authenticated user session found for re-authentication.',
+    };
   }
+  return signInWithEmail(client, user.email, password);
 }
 
 export { createClient };
+
+// React Auth Provider and Hook
+export * from './auth-provider.js';
+
+// Client-Safe Analytics Manager and Hooks
+export * from './analytics.js';

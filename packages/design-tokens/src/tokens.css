@@ -1,56 +1,76 @@
 /* =============================================================================
-   @platform/design-tokens — CSS Custom Properties
-   Import this in your web application's root CSS file.
+   @platform/design-tokens — Master CSS Custom Properties
+   Derived from 09_DESIGN_SYSTEM.md and PHASE_14.9A_MASTER_UI_UX_DESIGN_DIRECTION.md
    ============================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* --- Brand Colors --- */
-  --color-brand: hsl(258, 90%, 60%);
-  --color-brand-strong: hsl(258, 90%, 48%);
-  --color-brand-subtle: hsl(258, 90%, 95%);
+  /* --- Brand & Accent Colors --- */
+  --color-brand: #7C3AED;                     /* Primary Electric Violet */
+  --color-brand-strong: #6D28D9;              /* Active / Hover Violet */
+  --color-brand-subtle: rgba(124, 58, 237, 0.15);
+  --color-brand-glow: rgba(124, 58, 237, 0.35);
 
-  /* --- Backgrounds --- */
-  --color-background: hsl(220, 20%, 8%);
-  --color-surface: hsl(220, 16%, 12%);
-  --color-surface-elevated: hsl(220, 14%, 16%);
-  --color-surface-hover: hsl(220, 14%, 20%);
+  --color-accent-pink: #EC4899;                /* Secondary Energy Pink */
+  --color-accent-pink-subtle: rgba(236, 72, 153, 0.15);
+  --color-accent-cyan: #06B6D4;                /* Tertiary Cyan */
+  --color-accent-cyan-subtle: rgba(6, 182, 212, 0.15);
 
-  /* --- Text --- */
-  --color-text-primary: hsl(220, 20%, 96%);
-  --color-text-secondary: hsl(220, 10%, 65%);
-  --color-text-muted: hsl(220, 8%, 45%);
-  --color-text-inverse: hsl(220, 20%, 8%);
+  /* --- Deep Obsidian Dark Surfaces --- */
+  --color-bg-base: #090C15;                    /* Canvas Background */
+  --color-bg-surface: #111625;                 /* Primary Card / Panel */
+  --color-bg-surface-elevated: #182035;        /* Elevated Modal / Popover */
+  --color-bg-surface-hover: #222C46;           /* Row / Item Hover */
+  --color-bg-glass: rgba(17, 22, 37, 0.75);    /* Glassmorphic Panel */
+  --color-bg-glass-strong: rgba(24, 32, 53, 0.88);
 
-  /* --- Borders --- */
-  --color-border: hsl(220, 14%, 22%);
-  --color-border-strong: hsl(220, 14%, 32%);
+  /* Legacy aliases for backward compatibility */
+  --color-background: var(--color-bg-base);
+  --color-surface: var(--color-bg-surface);
+  --color-surface-elevated: var(--color-bg-surface-elevated);
+  --color-surface-hover: var(--color-bg-surface-hover);
+
+  /* --- Text & Content --- */
+  --color-text-primary: #F8FAFC;               /* High Emphasis / Headings */
+  --color-text-secondary: #94A3B8;             /* Medium Emphasis / Body */
+  --color-text-muted: #64748B;                 /* Low Emphasis / Captions */
+  --color-text-inverse: #090C15;               /* Text on Light / Brand Pill */
+
+  /* --- Borders & Specular Hairlines --- */
+  --color-border: rgba(255, 255, 255, 0.08);   /* Subtle Divider */
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-border-focus: #7C3AED;
 
   /* --- Semantic States --- */
-  --color-success: hsl(152, 70%, 48%);
-  --color-success-subtle: hsl(152, 70%, 12%);
-  --color-warning: hsl(38, 90%, 52%);
-  --color-warning-subtle: hsl(38, 90%, 12%);
-  --color-danger: hsl(0, 75%, 58%);
-  --color-danger-subtle: hsl(0, 75%, 12%);
-  --color-info: hsl(210, 85%, 58%);
-  --color-info-subtle: hsl(210, 85%, 12%);
+  --color-success: #10B981;
+  --color-success-subtle: rgba(16, 185, 129, 0.12);
+  --color-warning: #F59E0B;
+  --color-warning-subtle: rgba(245, 158, 11, 0.12);
+  --color-danger: #EF4444;
+  --color-danger-subtle: rgba(239, 68, 68, 0.12);
+  --color-info: #3B82F6;
+  --color-info-subtle: rgba(59, 130, 246, 0.12);
 
   /* --- Typography --- */
-  --font-sans: 'Inter', 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   --text-display: 56px;
   --text-h1: 40px;
   --text-h2: 32px;
   --text-h3: 24px;
+  --text-h4: 20px;
   --text-body-large: 18px;
   --text-body: 16px;
   --text-body-small: 14px;
   --text-caption: 12px;
+  --text-micro: 10px;
 
-  /* --- Spacing --- */
+  /* --- Spacing Scale (4px grid) --- */
+  --space-0: 0px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -62,49 +82,41 @@
   --space-12: 48px;
   --space-16: 64px;
   --space-20: 80px;
+  --space-24: 96px;
 
   /* --- Radius --- */
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
+  --radius-full: 50%;
 
-  /* --- Shadows --- */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-brand: 0 4px 24px hsl(258 90% 60% / 0.3);
-  --shadow-glow: 0 0 40px hsl(258 90% 60% / 0.2);
+  /* --- Shadows & Elevation --- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.65);
+  --shadow-brand: 0 4px 24px rgba(124, 58, 237, 0.35);
+  --shadow-glow: 0 0 32px rgba(124, 58, 237, 0.25);
 
-  /* --- Transitions --- */
-  --transition-fast: 120ms ease-out;
-  --transition-normal: 200ms ease-out;
-  --transition-slow: 320ms ease-out;
+  /* --- Transitions & Timing --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 120ms var(--ease-out);
+  --transition-normal: 200ms var(--ease-out);
+  --transition-slow: 280ms var(--ease-out);
   --transition-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* --- Z-Index --- */
+  /* --- Z-Index Scale --- */
   --z-base: 0;
   --z-elevated: 10;
   --z-sticky: 100;
-  --z-overlay: 200;
-  --z-modal: 300;
-  --z-toast: 400;
-  --z-tooltip: 500;
-}
-
-/* Light mode overrides (optional — currently dark-first) */
-@media (prefers-color-scheme: light) {
-  :root[data-theme="light"] {
-    --color-background: hsl(0, 0%, 100%);
-    --color-surface: hsl(220, 14%, 97%);
-    --color-surface-elevated: hsl(220, 14%, 94%);
-    --color-text-primary: hsl(220, 20%, 8%);
-    --color-text-secondary: hsl(220, 10%, 35%);
-    --color-text-muted: hsl(220, 8%, 55%);
-    --color-border: hsl(220, 14%, 88%);
-    --color-border-strong: hsl(220, 14%, 78%);
-  }
+  --z-drawer: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
 }
 
 /* Reduced motion support */
@@ -117,17 +129,43 @@
   }
 }
 
-/* Global reset and base styles */
+/* Global Reset & Base Typography */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-background);
+  background-color: var(--color-bg-base);
   color: var(--color-text-primary);
   font-size: var(--text-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Common Global Utilities */
+.glass-panel {
+  background: var(--color-bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border);
+}
+
+.glass-panel-elevated {
+  background: var(--color-bg-glass-strong);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-strong);
+}
+
+.text-gradient-brand {
+  background: linear-gradient(135deg, #FFFFFF 0%, #C4B5FD 50%, #EC4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }

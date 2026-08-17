@@ -1,36 +1,61 @@
 // =============================================================================
-// EventPlatform — Scanner Mobile App
-// Entry point
-//
-// SECURITY:
-// - Only SUPABASE_ANON_KEY is used here (for scanner staff login)
-// - Device credentials are stored in flutter_secure_storage
-// - Offline scan queue stored in SQLite (sqflite)
-// - All check-in validation happens server-side
+// Scanner Mobile — Main Entry Point
+// Implements staff authentication guard, session persistence, and Riverpod scope.
 // =============================================================================
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/scanner_auth_service.dart';
+import 'screens/login_screen.dart';
+import 'screens/scan_screen.dart';
 
 const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const String _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-const String _apiBaseUrl =
-    String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:3001');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (_supabaseUrl.isNotEmpty && _supabaseAnonKey.isNotEmpty) {
-    await Supabase.initialize(
-      url: _supabaseUrl,
-      anonKey: _supabaseAnonKey,
-    );
-  }
+  await Supabase.initialize(
+    url: _supabaseUrl.isNotEmpty ? _supabaseUrl : 'https://placeholder.supabase.co',
+    // ignore: deprecated_member_use
+    anonKey: _supabaseAnonKey.isNotEmpty ? _supabaseAnonKey : 'placeholder-anon-key',
+  );
 
-  runApp(const ScannerApp());
+  runApp(
+    const ProviderScope(
+      child: ScannerApp(),
+    ),
+  );
 }
 
-class ScannerApp extends StatelessWidget {
+class ScannerApp extends StatefulWidget {
   const ScannerApp({super.key});
+
+  @override
+  State<ScannerApp> createState() => _ScannerAppState();
+}
+
+class _ScannerAppState extends State<ScannerApp> {
+  final ScannerAuthService _authService = BasicScannerAuthService();
+  bool _initializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    try {
+      await _authService.restoreSession();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _initializing = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,56 +68,19 @@ class ScannerApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        fontFamily: 'Inter',
       ),
       themeMode: ThemeMode.dark,
-      home: const _PlaceholderScreen(),
-    );
-  }
-}
-
-/// Placeholder screen — replaced with full scanner UI in Task 7.x
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F1117),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF059669), // green for scanner
-                borderRadius: BorderRadius.circular(24),
+      home: _initializing
+          ? const Scaffold(
+              backgroundColor: Color(0xFF0F1117),
+              body: Center(
+                child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
               ),
-              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 40),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Event Scanner',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Scanner Mobile — Foundation Scaffold',
-              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Full scanner implemented in Task 7.x',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-            ),
-          ],
-        ),
-      ),
+            )
+          : _authService.isAuthenticated
+              ? const ScanScreen()
+              : ScannerLoginScreen(authService: _authService),
     );
   }
 }

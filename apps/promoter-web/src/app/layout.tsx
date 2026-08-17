@@ -1,5 +1,27 @@
-﻿import type { Metadata } from 'next';
-export const metadata: Metadata = { title: 'Promoter Dashboard | EventPlatform', description: 'EventPlatform Promoter Dashboard' };
+// =============================================================================
+// promoter-web — Root Layout
+// Wrapped with AuthProvider and RoleGuard.
+// =============================================================================
+import type { Metadata } from 'next';
+import { AuthProvider } from '@platform/auth';
+import { RoleGuard } from '../components/RoleGuard';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Promoter Dashboard | EventPlatform',
+  description: 'EventPlatform Promoter Portal — Track affiliate performance and earnings',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (<html lang="en"><body>{children}</body></html>);
+  return (
+    <html lang="en">
+      <body className="bg-[#0F1117] text-white antialiased">
+        <AuthProvider>
+          <RoleGuard>
+            {children}
+          </RoleGuard>
+        </AuthProvider>
+      </body>
+    </html>
+  );
 }

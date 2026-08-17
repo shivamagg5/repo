@@ -1,52 +1,69 @@
 // =============================================================================
 // @platform/design-tokens
 // Source of truth for all visual design tokens.
-// Derived from 09_DESIGN_SYSTEM.md
+// Derived from 09_DESIGN_SYSTEM.md and PHASE_14.9A_MASTER_UI_UX_DESIGN_DIRECTION.md
 // =============================================================================
 
 // ---------------------------------------------------------------------------
-// Colors — Semantic Roles
-// Modern, premium, energetic palette (HSL-based for easy theming)
+// Colors — Semantic Roles & Obsidian Surfaces
 // ---------------------------------------------------------------------------
 export const colors = {
-  // Brand — vibrant electric violet
-  brand: 'hsl(258, 90%, 60%)',
-  brandStrong: 'hsl(258, 90%, 48%)',
-  brandSubtle: 'hsl(258, 90%, 95%)',
+  // Primary Brand — Electric Violet
+  brand: '#7C3AED',
+  brandStrong: '#6D28D9',
+  brandSubtle: 'rgba(124, 58, 237, 0.15)',
+  brandGlow: 'rgba(124, 58, 237, 0.35)',
 
-  // Backgrounds
-  background: 'hsl(220, 20%, 8%)',
-  surface: 'hsl(220, 16%, 12%)',
-  surfaceElevated: 'hsl(220, 14%, 16%)',
-  surfaceHover: 'hsl(220, 14%, 20%)',
+  // Secondary Accents
+  accentPink: '#EC4899',
+  accentPinkSubtle: 'rgba(236, 72, 153, 0.15)',
+  accentCyan: '#06B6D4',
+  accentCyanSubtle: 'rgba(6, 182, 212, 0.15)',
 
-  // Text
-  textPrimary: 'hsl(220, 20%, 96%)',
-  textSecondary: 'hsl(220, 10%, 65%)',
-  textMuted: 'hsl(220, 8%, 45%)',
-  textInverse: 'hsl(220, 20%, 8%)',
+  // Deep Obsidian Dark Surfaces
+  bgBase: '#090C15',
+  bgSurface: '#111625',
+  bgSurfaceElevated: '#182035',
+  bgSurfaceHover: '#222C46',
+  bgGlass: 'rgba(17, 22, 37, 0.75)',
+  bgGlassStrong: 'rgba(24, 32, 53, 0.88)',
 
-  // Borders
-  border: 'hsl(220, 14%, 22%)',
-  borderStrong: 'hsl(220, 14%, 32%)',
+  // Legacy Aliases
+  background: '#090C15',
+  surface: '#111625',
+  surfaceElevated: '#182035',
+  surfaceHover: '#222C46',
 
-  // Semantic states
-  success: 'hsl(152, 70%, 48%)',
-  successSubtle: 'hsl(152, 70%, 12%)',
-  warning: 'hsl(38, 90%, 52%)',
-  warningSubtle: 'hsl(38, 90%, 12%)',
-  danger: 'hsl(0, 75%, 58%)',
-  dangerSubtle: 'hsl(0, 75%, 12%)',
-  info: 'hsl(210, 85%, 58%)',
-  infoSubtle: 'hsl(210, 85%, 12%)',
+  // Text Hierarchy
+  textPrimary: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textMuted: '#64748B',
+  textInverse: '#090C15',
+
+  // Borders & Specular Hairlines
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderSubtle: 'rgba(255, 255, 255, 0.08)',
+  borderStrong: 'rgba(255, 255, 255, 0.16)',
+  borderFocus: '#7C3AED',
+
+  // Semantic States
+  success: '#10B981',
+  successSubtle: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningSubtle: 'rgba(245, 158, 11, 0.12)',
+  danger: '#EF4444',
+  dangerSubtle: 'rgba(239, 68, 68, 0.12)',
+  info: '#3B82F6',
+  infoSubtle: 'rgba(59, 130, 246, 0.12)',
 } as const;
 
 // ---------------------------------------------------------------------------
-// Typography Scale — based on 09_DESIGN_SYSTEM.md
+// Typography Scale
 // ---------------------------------------------------------------------------
 export const typography = {
   fontFamily: {
-    sans: "'Inter', 'Outfit', system-ui, -apple-system, sans-serif",
+    display: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    sans: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     mono: "'JetBrains Mono', 'Fira Code', monospace",
   },
   fontSize: {
@@ -54,10 +71,12 @@ export const typography = {
     h1: '40px',
     h2: '32px',
     h3: '24px',
+    h4: '20px',
     bodyLarge: '18px',
     body: '16px',
     bodySmall: '14px',
     caption: '12px',
+    micro: '10px',
   },
   fontWeight: {
     regular: '400',
@@ -65,6 +84,7 @@ export const typography = {
     semibold: '600',
     bold: '700',
     extrabold: '800',
+    black: '900',
   },
   lineHeight: {
     tight: '1.2',
@@ -82,7 +102,7 @@ export const typography = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Spacing — 4px base grid
+// Spacing Scale — 4px Grid
 // ---------------------------------------------------------------------------
 export const spacing = {
   '0': '0px',
@@ -104,9 +124,10 @@ export const spacing = {
 // Border Radius
 // ---------------------------------------------------------------------------
 export const radius = {
-  small: '8px',
-  medium: '12px',
-  large: '16px',
+  xs: '4px',
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
   xl: '24px',
   pill: '9999px',
   full: '50%',
@@ -117,29 +138,31 @@ export const radius = {
 // ---------------------------------------------------------------------------
 export const breakpoints = {
   mobile: '0px',
-  tablet: '640px',
-  desktop: '1024px',
-  wide: '1440px',
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1440px',
+  wide: '1920px',
 } as const;
 
 // ---------------------------------------------------------------------------
-// Shadows
+// Shadows & Elevation
 // ---------------------------------------------------------------------------
 export const shadows = {
-  sm: '0 1px 3px rgba(0,0,0,0.4)',
-  md: '0 4px 16px rgba(0,0,0,0.4)',
-  lg: '0 8px 32px rgba(0,0,0,0.5)',
-  brand: '0 4px 24px hsl(258 90% 60% / 0.3)',
-  glow: '0 0 40px hsl(258 90% 60% / 0.2)',
+  sm: '0 1px 2px rgba(0, 0, 0, 0.5)',
+  md: '0 4px 16px rgba(0, 0, 0, 0.5)',
+  lg: '0 12px 36px rgba(0, 0, 0, 0.65)',
+  brand: '0 4px 24px rgba(124, 58, 237, 0.35)',
+  glow: '0 0 32px rgba(124, 58, 237, 0.25)',
 } as const;
 
 // ---------------------------------------------------------------------------
 // Transitions
 // ---------------------------------------------------------------------------
 export const transitions = {
-  fast: '120ms ease-out',
-  normal: '200ms ease-out',
-  slow: '320ms ease-out',
+  fast: '120ms cubic-bezier(0.16, 1, 0.3, 1)',
+  normal: '200ms cubic-bezier(0.16, 1, 0.3, 1)',
+  slow: '280ms cubic-bezier(0.16, 1, 0.3, 1)',
   spring: '320ms cubic-bezier(0.34, 1.56, 0.64, 1)',
 } as const;
 
@@ -150,10 +173,11 @@ export const zIndex = {
   base: 0,
   elevated: 10,
   sticky: 100,
-  overlay: 200,
-  modal: 300,
-  toast: 400,
-  tooltip: 500,
+  drawer: 200,
+  overlay: 300,
+  modal: 400,
+  toast: 500,
+  tooltip: 600,
 } as const;
 
 // ---------------------------------------------------------------------------

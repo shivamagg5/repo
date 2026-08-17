@@ -16,7 +16,7 @@
     "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "node --test dist/index.test.js",
+    "test": "node --test dist/index.spec.js",
     "test:unit": "pnpm test",
     "clean": "rimraf dist"
   },
@@ -24,6 +24,7 @@
     "@platform/types": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "rimraf": "^6.0.0",
     "typescript": "^5.5.0"
   }

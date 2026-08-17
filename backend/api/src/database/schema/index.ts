@@ -4,6 +4,7 @@
 // If you change the database schema, update the SQL migration first,
 // then update this file to match.
 // =============================================================================
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   uuid,
@@ -429,41 +430,51 @@ export const commissionEntries = pgTable('commission_entries', {
 });
 
 // ---------------------------------------------------------------------------
-// FINANCE
+// FINANCE & SETTLEMENTS (PHASE 10)
 // ---------------------------------------------------------------------------
-export const ledgerAccounts = pgTable('ledger_accounts', {
+export const financialTransactions = pgTable('financial_transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerType: text('owner_type').notNull(),
-  ownerId: uuid('owner_id').notNull(),
-  currency: char('currency', { length: 3 }).notNull().default('INR'),
-  status: text('status').notNull().default('active'),
+  transactionNumber: text('transaction_number').unique().notNull(),
+  transactionType: text('transaction_type').notNull(),
+  status: text('status').notNull().default('posted'),
+  currency: text('currency').notNull().default('INR'),
+  referenceType: text('reference_type').notNull(),
+  referenceId: uuid('reference_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const ledgerEntries = pgTable('ledger_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
-  accountId: uuid('account_id').notNull().references(() => ledgerAccounts.id, { onDelete: 'restrict' }),
-  transactionType: text('transaction_type').notNull(),
-  referenceType: text('reference_type').notNull(),
-  referenceId: uuid('reference_id').notNull(),
-  debitMinor: bigint('debit_minor', { mode: 'number' }).notNull().default(0),
-  creditMinor: bigint('credit_minor', { mode: 'number' }).notNull().default(0),
+  transactionId: uuid('transaction_id').notNull().references(() => financialTransactions.id, { onDelete: 'cascade' }),
+  account: text('account').notNull(),
+  debitMinor: bigint('debit_minor', { mode: 'number' }).notNull().default(sql`0`),
+  creditMinor: bigint('credit_minor', { mode: 'number' }).notNull().default(sql`0`),
+  currency: text('currency').notNull().default('INR'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const settlements = pgTable('settlements', {
   id: uuid('id').primaryKey().defaultRandom(),
-  beneficiaryOrganizationId: uuid('beneficiary_organization_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+  eventId: uuid('event_id').references(() => events.id, { onDelete: 'set null' }),
+  grossSalesMinor: bigint('gross_sales_minor', { mode: 'number' }).notNull().default(sql`0`),
+  refundsMinor: bigint('refunds_minor', { mode: 'number' }).notNull().default(sql`0`),
+  platformCommissionMinor: bigint('platform_commission_minor', { mode: 'number' }).notNull().default(sql`0`),
+  promoterCommissionMinor: bigint('promoter_commission_minor', { mode: 'number' }).notNull().default(sql`0`),
+  taxMinor: bigint('tax_minor', { mode: 'number' }).notNull().default(sql`0`),
+  netSettlementMinor: bigint('net_settlement_minor', { mode: 'number' }).notNull().default(sql`0`),
+  status: settlementStatusEnum('status').notNull().default('draft'),
   periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
   periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
-  grossMinor: bigint('gross_minor', { mode: 'number' }).notNull().default(0),
-  deductionsMinor: bigint('deductions_minor', { mode: 'number' }).notNull().default(0),
-  commissionMinor: bigint('commission_minor', { mode: 'number' }).notNull().default(0),
-  netMinor: bigint('net_minor', { mode: 'number' }).notNull().default(0),
-  status: settlementStatusEnum('status').notNull().default('draft'),
+  idempotencyKey: text('idempotency_key').unique().notNull(),
+  preparedBy: uuid('prepared_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  preparedAt: timestamp('prepared_at', { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
-  paidAt: timestamp('paid_at', { withTimezone: true }),
+  rejectionReason: text('rejection_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({ unqSettlementScope: unique().on(t.organizationId, t.eventId, t.periodStart, t.periodEnd) }));
 
 export const settlementItems = pgTable('settlement_items', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -482,7 +493,7 @@ export const notificationPreferences = pgTable('notification_preferences', {
   channel: text('channel').notNull(),
   category: text('category').notNull(),
   enabled: boolean('enabled').notNull().default(true),
-}, (t) => ({ unqNotifPref: unique().on(t.userId, t.channel, t.category) }));
+}, (t) => ({ unqUserChannelCategory: unique().on(t.userId, t.channel, t.category) }));
 
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -500,11 +511,13 @@ export const notifications = pgTable('notifications', {
 export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceId: text('device_id').notNull().default('device_unknown'),
+  token: text('token').notNull(),
   platform: text('platform').notNull(),
-  token: text('token').unique().notNull(),
-  status: text('status').notNull().default('active'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+  active: boolean('active').notNull().default(true),
+  lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ unqDevicePlatformToken: unique().on(t.platform, t.token) }));
 
 // ---------------------------------------------------------------------------
 // SUPPORT
@@ -563,6 +576,182 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// RECONCILIATION (PHASE 10)
+// ---------------------------------------------------------------------------
+
+export const reconciliationRuns = pgTable('reconciliation_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reconciliationDate: timestamp('reconciliation_date', { withTimezone: true }).notNull().defaultNow(),
+  totalOrdersCount: integer('total_orders_count').notNull().default(0),
+  totalMatchedCount: integer('total_matched_count').notNull().default(0),
+  totalMismatchedCount: integer('total_mismatched_count').notNull().default(0),
+  status: text('status').notNull().default('clean'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const reconciliationExceptions = pgTable('reconciliation_exceptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reconciliationRunId: uuid('reconciliation_run_id').notNull().references(() => reconciliationRuns.id, { onDelete: 'cascade' }),
+  internalReference: text('internal_reference').notNull(),
+  providerReference: text('provider_reference'),
+  expectedAmountMinor: bigint('expected_amount_minor', { mode: 'number' }).notNull().default(sql`0`),
+  actualAmountMinor: bigint('actual_amount_minor', { mode: 'number' }).notNull().default(sql`0`),
+  currency: text('currency').notNull().default('INR'),
+  differenceMinor: bigint('difference_minor', { mode: 'number' }).notNull().default(sql`0`),
+  mismatchType: text('mismatch_type').notNull(),
+  status: text('status').notNull().default('open'),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedBy: uuid('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+});
+
+// ---------------------------------------------------------------------------
+// NOTIFICATIONS & CMS (PHASE 11)
+// ---------------------------------------------------------------------------
+export const notificationOutbox = pgTable('notification_outbox', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventId: text('event_id'),
+  notificationType: text('notification_type').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  payloadJson: text('payload_json').notNull(),
+  status: text('status').notNull().default('pending'),
+  idempotencyKey: text('idempotency_key').unique().notNull(),
+  retryCount: integer('retry_count').notNull().default(0),
+  lockedAt: timestamp('locked_at', { withTimezone: true }),
+  lockedBy: text('locked_by'),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+
+export const notificationTemplates = pgTable('notification_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  notificationType: text('notification_type').notNull(),
+  locale: text('locale').notNull().default('en'),
+  channel: text('channel').notNull(),
+  version: integer('version').notNull().default(1),
+  subject: text('subject').notNull(),
+  bodyTemplate: text('body_template').notNull(),
+  variablesJson: text('variables_json').notNull().default('[]'),
+}, (t) => ({ unqTemplateVersion: unique().on(t.notificationType, t.locale, t.channel, t.version) }));
+
+export const notificationLogs = pgTable('notification_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  outboxId: uuid('outbox_id').references(() => notificationOutbox.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  notificationType: text('notification_type').notNull(),
+  channel: text('channel').notNull(),
+  recipient: text('recipient').notNull(),
+  subject: text('subject').notNull(),
+  status: text('status').notNull().default('queued'),
+  providerMessageId: text('provider_message_id'),
+  failureReason: text('failure_reason'),
+  retryCount: integer('retry_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const notificationDeliveryAttempts = pgTable('notification_delivery_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  logId: uuid('log_id').notNull().references(() => notificationLogs.id, { onDelete: 'cascade' }),
+  attemptNumber: integer('attempt_number').notNull(),
+  provider: text('provider').notNull(),
+  providerMessageId: text('provider_message_id'),
+  status: text('status').notNull(),
+  failureReason: text('failure_reason'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+export const inAppNotifications = pgTable('in_app_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  metadata: text('metadata').notNull().default('{}'),
+  read: boolean('read').notNull().default(false),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cmsBanners = pgTable('cms_banners', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  imageUrl: text('image_url').notNull(),
+  targetUrl: text('target_url').notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  status: text('status').notNull().default('draft'),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  endAt: timestamp('end_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cmsFeaturedEvents = pgTable('cms_featured_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  displayOrder: integer('display_order').notNull().default(0),
+  badgeText: text('badge_text'),
+  status: text('status').notNull().default('published'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cmsCollections = pgTable('cms_collections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  slug: text('slug').unique().notNull(),
+  description: text('description'),
+  coverImageUrl: text('cover_image_url'),
+  status: text('status').notNull().default('draft'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cmsCollectionEvents = pgTable('cms_collection_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  collectionId: uuid('collection_id').notNull().references(() => cmsCollections.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  displayOrder: integer('display_order').notNull().default(0),
+}, (t) => ({ unqCollectionEvent: unique().on(t.collectionId, t.eventId) }));
+
+export const cmsEditorialBlocks = pgTable('cms_editorial_blocks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  blockType: text('block_type').notNull(),
+  headline: text('headline').notNull(),
+  bodyMarkdown: text('body_markdown').notNull(),
+  mediaUrl: text('media_url'),
+  displayOrder: integer('display_order').notNull().default(0),
+  status: text('status').notNull().default('draft'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// ANALYTICS & FUNNELS (PHASE 12)
+// ---------------------------------------------------------------------------
+export const analyticsEvents = pgTable('analytics_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientEventId: text('client_event_id').unique(),
+  eventName: text('event_name').notNull(),
+  eventId: uuid('event_id').references(() => events.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  sessionId: text('session_id'),
+  platform: text('platform').notNull().default('web'),
+  appVersion: text('app_version'),
+  propertiesJson: text('properties_json').notNull().default('{}'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const analyticsAggregatesDaily = pgTable('analytics_aggregates_daily', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  aggregateDate: timestamp('aggregate_date', { withTimezone: true }).notNull(),
+  metricName: text('metric_name').notNull(),
+  dimensionType: text('dimension_type'),
+  dimensionId: text('dimension_id'),
+  metricValue: bigint('metric_value', { mode: 'number' }).notNull().default(sql`0`),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ unqAggregateDimension: unique().on(t.aggregateDate, t.metricName, t.dimensionType, t.dimensionId) }));
+
 // Indexes are defined inline within table definitions using the third argument.
 // See table definitions above for all index declarations.
 // The following are named references for documentation purposes only.
@@ -576,7 +765,9 @@ export const INDEX_TICKETS_EVENT = 'idx_tickets_event';
 export const INDEX_TICKETS_ORDER = 'idx_tickets_order';
 export const INDEX_CHECKINS_EVENT = 'idx_checkins_event_time';
 export const INDEX_NOTIFICATIONS_USER_STATUS = 'idx_notifications_user_status';
-export const INDEX_MEMBERS_USER_ORG = 'idx_members_user_org';
-export const INDEX_AUDIT_ENTITY = 'idx_audit_entity';
-export const INDEX_RESERVATIONS_EXPIRY = 'idx_reservations_expiry';
-export const INDEX_PAYMENT_EVENTS_STATUS = 'idx_payment_events_status';
+export const INDEX_USERS_EMAIL_STATUS = 'idx_users_email_status';
+export const INDEX_ORDERS_USER_STATUS = 'idx_orders_user_status';
+export const INDEX_TICKETS_QR_STATUS = 'idx_tickets_qr_status';
+export const INDEX_CHECKINS_EVENT_SCANNED = 'idx_checkins_event_scanned';
+export const INDEX_ANALYTICS_EVENTS_NAME_OCCURRED = 'idx_analytics_events_name_occurred';
+export const INDEX_NOTIFICATION_OUTBOX_STATUS_LOCKED = 'idx_notification_outbox_status_locked';

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useAnalytics } from '@platform/auth';
 import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
 import { EventCard } from '../../components/EventCard';
@@ -11,6 +12,7 @@ import type { EventListItemDto, EventCategory, CursorPaginatedResponse } from '@
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { track } = useAnalytics(apiClient);
 
   const [qInput, setQInput] = useState(searchParams.get('q') ?? '');
   const [events, setEvents] = useState<EventListItemDto[]>([]);
@@ -33,13 +35,17 @@ function SearchContent() {
       if (datePresetParam) params['datePreset'] = datePresetParam;
 
       const res = await apiClient.getPublicEventsFeed<CursorPaginatedResponse<EventListItemDto>>(params);
-      setEvents(res.items ?? []);
+      const items = res.items ?? [];
+      setEvents(items);
+      if (qParam || categoryParam || cityParam) {
+        track('search_completed', { query: qParam, category: categoryParam, city: cityParam, resultCount: items.length });
+      }
     } catch (err) {
       console.error('Search failed', err);
     } finally {
       setLoading(false);
     }
-  }, [qParam, categoryParam, cityParam, datePresetParam, sortParam]);
+  }, [qParam, categoryParam, cityParam, datePresetParam, sortParam, track]);
 
   useEffect(() => {
     executeSearch();

@@ -19,5 +19,7 @@ export * from './domain/finance.js';
 export * from './domain/notification.js';
 export * from './domain/support.js';
 export * from './domain/moderation.js';
+export * from './domain/admin.js';
+export * from './domain/analytics.js';
 export * from './api/response.js';
 export * from './api/pagination.js';

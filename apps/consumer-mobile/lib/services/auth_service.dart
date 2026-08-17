@@ -121,7 +121,7 @@ class AuthService {
   Stream<AuthState> get authStateStream => _supabase.auth.onAuthStateChange;
 
   /// Get the authorization header for API calls.
-  /// Returns 'Bearer <access_token>' or null if not authenticated.
+  /// Returns 'Bearer [token]' or null if not authenticated.
   Future<String?> getAuthorizationHeader() async {
     final session = currentSession;
     if (session == null) return null;

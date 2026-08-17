@@ -21,18 +21,22 @@ import { createSupabaseClient } from '@platform/auth';
 const PUBLIC_PATHS = [
   '/',
   '/events',
+  '/venues',
+  '/search',
+  '/categories',
   '/auth/login',
+  '/auth/register',
   '/auth/signup',
   '/auth/callback',
   '/auth/reset-password',
 ];
 
-const PUBLIC_PREFIXES = ['/events/', '/auth/'];
+const PUBLIC_PREFIXES = ['/events/', '/venues/', '/categories/', '/search/', '/auth/'];
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true;
   if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
-  if (pathname.startsWith('/_next/') || pathname.startsWith('/favicon')) return true;
+  if (pathname.startsWith('/_next/') || pathname.startsWith('/favicon') || pathname.startsWith('/api/')) return true;
   return false;
 }
 

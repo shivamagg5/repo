@@ -1,26 +1,13 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { FinanceController } from './finance.controller';
+import { LedgerService } from './ledger.service';
+import { ReconciliationService } from './reconciliation.service';
+import { AuditModule } from '../../common/audit/audit.module';
 
-/**
- * Finance Module
- * 
- * Domain: finance
- * Status: Scaffolded (Task 0.1) — business logic implemented in later phases.
- * 
- * Phase schedule:
- * - Auth/Users/Orgs: Task 1.1
- * - Venues/Events: Task 2.x
- * - Tickets/Orders: Task 4.x
- * - Payments/Refunds: Task 5.x
- * - Scanner: Task 7.x
- * - Finance/Settlements: Task 9.x / 10.x
- * - Promoters/Commissions: Task 10.x
- * - Notifications/CMS: Task 11.x
- * - Analytics: Task 12.x
- * - Support/Moderation/Admin: Task 8.x / 9.x
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [AuditModule],
+  controllers: [FinanceController],
+  providers: [LedgerService, ReconciliationService],
+  exports: [LedgerService, ReconciliationService],
 })
 export class FinanceModule {}

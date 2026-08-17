@@ -14,7 +14,7 @@
     "./css": "./dist/tokens.css"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json && node --input-type=module < scripts/build-css.mjs",
+    "build": "tsc --project tsconfig.json && node -e \"import('fs').then(fs => fs.copyFileSync('src/tokens.css', 'dist/tokens.css'))\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "node --test dist/index.test.js",

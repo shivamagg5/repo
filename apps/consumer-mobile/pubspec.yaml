@@ -40,6 +40,18 @@ dependencies:
   # State management
   riverpod: ^2.5.0
   flutter_riverpod: ^2.5.0
+  # QR Code rendering
+  qr_flutter: ^4.1.0
+  # Typography — Urbanist font
+  google_fonts: ^6.0.0
+  # Image caching for event artwork
+  cached_network_image: ^3.3.0
+  # Barcode rendering for ticket cards
+  barcode_widget: ^2.0.0
+  # Page indicator for onboarding carousel
+  smooth_page_indicator: ^1.1.0
+  # Local storage for onboarding-seen flag
+  shared_preferences: ^2.2.0
 
 dev_dependencies:
   flutter_test:

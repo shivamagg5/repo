@@ -7,13 +7,17 @@ import {
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
 import { tickets } from '../../database/schema/index';
+import { ScannerCryptoService } from '../scanner/scanner-crypto.service';
 import type { AuthContext, Ticket } from '@platform/types';
 
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger('TicketsService');
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly scannerCrypto: ScannerCryptoService,
+  ) {}
 
   /**
    * Find all tickets belonging to authenticated consumer.
@@ -45,6 +49,24 @@ export class TicketsService {
   }
 
   private mapTicket(raw: typeof tickets.$inferSelect): Ticket {
+    let qrToken: string | undefined;
+
+    if (raw.status === 'issued' || raw.status === 'checked_in') {
+      try {
+        qrToken = this.scannerCrypto.signTicketCredential({
+          version: 'v1',
+          ticketId: raw.id,
+          eventId: raw.eventId,
+          ticketTypeId: raw.ticketTypeId,
+          issuedAt: raw.issuedAt.toISOString(),
+          expiresAt: null,
+          keyVersion: 'v1-2026',
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to sign ticket credential for ticket ${raw.id}: ${(err as Error).message}`);
+      }
+    }
+
     return {
       id: raw.id,
       orderId: raw.orderId,
@@ -55,6 +77,7 @@ export class TicketsService {
       ticketNumber: raw.ticketNumber,
       status: raw.status as any,
       qrTokenHash: raw.qrTokenHash,
+      qrToken,
       issuedAt: raw.issuedAt.toISOString(),
       checkedInAt: raw.checkedInAt ? raw.checkedInAt.toISOString() : null,
       voidedAt: raw.voidedAt ? raw.voidedAt.toISOString() : null,

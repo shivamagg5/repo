@@ -8,6 +8,7 @@ import { Footer } from '../components/Footer';
 import { EventCard } from '../components/EventCard';
 import { VenueCard } from '../components/VenueCard';
 import { apiClient } from '../lib/api';
+import { SearchInput, Button, Badge } from '@platform/ui';
 import type { EventListItemDto, VenuePublic, EventCategory } from '@platform/types';
 
 export default function HomePage() {
@@ -15,7 +16,6 @@ export default function HomePage() {
   const [venues, setVenues] = useState<VenuePublic[]>([]);
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [heroSearch, setHeroSearch] = useState('');
-  const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -59,55 +59,60 @@ export default function HomePage() {
   const popularCities = ['Mumbai', 'Delhi', 'Bengaluru', 'Goa', 'Amritsar'];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-background)]">
+    <div className="min-h-screen flex flex-col bg-[#090C15] text-[#F8FAFC]">
       <Navbar />
 
       {/* --- HERO SECTION --- */}
-      <section className="relative hero-gradient py-20 px-4 sm:px-6 lg:px-8 border-b border-[var(--color-border)] overflow-hidden">
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <span className="inline-block bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full mb-4">
-            Live Events & Experiences
-          </span>
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
+      <section className="relative hero-gradient py-20 sm:py-28 px-4 sm:px-6 lg:px-8 border-b border-[var(--color-border)] overflow-hidden">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="inline-flex mb-5">
+            <Badge variant="brand" size="md" dot pulse>
+              Live Experiences & Concerts
+            </Badge>
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight mb-6 leading-tight font-['Outfit']">
             Discover Unforgettable <br className="hidden sm:inline" />
             <span className="text-gradient">Live Events Near You</span>
           </h1>
-          <p className="text-base sm:text-xl text-[var(--color-text-secondary)] max-w-2xl mx-auto mb-8 leading-relaxed">
-            Concerts, standup comedy, cultural festivals, and sports match nights. Find your next experience.
+
+          <p className="text-base sm:text-xl text-[var(--color-text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed font-['Inter']">
+            Exclusive concerts, standup comedy tours, cultural festivals, and sports match nights. Verified tickets with instant digital wallet passes.
           </p>
 
           {/* Hero Search Box */}
-          <form onSubmit={handleHeroSearchSubmit} className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 glass-surface p-2 rounded-2xl shadow-[var(--shadow-lg)]">
+          <form onSubmit={handleHeroSearchSubmit} className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 glass-surface p-2.5 rounded-2xl shadow-[var(--shadow-lg)]">
             <div className="relative flex-1">
-              <input
-                type="text"
+              <SearchInput
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
-                placeholder="Search artists, shows, comedy, festivals..."
-                className="w-full bg-transparent text-white placeholder-[var(--color-text-muted)] text-sm px-4 py-3 focus:outline-none"
+                onClear={() => setHeroSearch('')}
+                placeholder="Search artists, tours, comedy specials, festivals..."
               />
             </div>
-            <button
+            <Button
+              variant="brand-glow"
+              size="md"
               type="submit"
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm px-8 py-3 rounded-xl transition-all shadow-[var(--shadow-brand)] hover:scale-[1.02]"
+              className="sm:w-auto"
             >
-              Search Events
-            </button>
+              Explore Now →
+            </Button>
           </form>
         </div>
       </section>
 
       {/* --- MAIN CONTENT CONTAINER --- */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-16 w-full">
 
         {/* --- CATEGORIES SECTION --- */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)]">
+            <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
               Browse Categories
             </h2>
             <Link href="/events" className="text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors">
-              View All →
+              View All Categories →
             </Link>
           </div>
 
@@ -117,9 +122,10 @@ export default function HomePage() {
                 <Link
                   key={cat.id}
                   href={`/events?category=${cat.slug}`}
-                  className="glass-surface glass-surface-hover px-5 py-2.5 rounded-full text-xs font-bold text-[var(--color-text-primary)] whitespace-nowrap transition-all"
+                  className="glass-surface glass-surface-hover px-5 py-2.5 rounded-full text-xs font-bold text-white whitespace-nowrap transition-all flex items-center gap-2"
                 >
-                  🎭 {cat.name}
+                  <span>🎭</span>
+                  <span>{cat.name}</span>
                 </Link>
               ))
             ) : (
@@ -127,9 +133,10 @@ export default function HomePage() {
                 <Link
                   key={idx}
                   href={`/events?category=${catName.toLowerCase().split(' ')[0]}`}
-                  className="glass-surface glass-surface-hover px-5 py-2.5 rounded-full text-xs font-bold text-[var(--color-text-primary)] whitespace-nowrap transition-all"
+                  className="glass-surface glass-surface-hover px-5 py-2.5 rounded-full text-xs font-bold text-white whitespace-nowrap transition-all flex items-center gap-2"
                 >
-                  ✨ {catName}
+                  <span>✨</span>
+                  <span>{catName}</span>
                 </Link>
               ))
             )}
@@ -140,11 +147,11 @@ export default function HomePage() {
         <section>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)]">
-                Upcoming Events
+              <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+                Trending & Upcoming Events
               </h2>
-              <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                Live published events ready for discovery
+              <p className="text-xs text-[var(--color-text-muted)] mt-1 font-['Inter']">
+                Live published experiences ready for booking
               </p>
             </div>
             <Link href="/events" className="text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors">
@@ -155,7 +162,7 @@ export default function HomePage() {
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="glass-surface rounded-2xl h-72 animate-pulse bg-[var(--color-surface)]" />
+                <div key={i} className="glass-surface rounded-2xl h-80 animate-pulse bg-[var(--color-surface)]" />
               ))}
             </div>
           ) : events.length > 0 ? (
@@ -167,9 +174,9 @@ export default function HomePage() {
           ) : (
             <div className="glass-surface rounded-2xl p-12 text-center max-w-lg mx-auto">
               <span className="text-3xl mb-3 block">🎪</span>
-              <h3 className="font-bold text-lg text-white mb-1">No Upcoming Events Found</h3>
+              <h3 className="font-bold text-lg text-white mb-1 font-['Outfit']">No Live Events Found</h3>
               <p className="text-xs text-[var(--color-text-muted)] mb-4">
-                Be the first to publish an event or check back soon for live listings!
+                Check back soon or explore our partnered venues!
               </p>
             </div>
           )}
@@ -178,11 +185,11 @@ export default function HomePage() {
         {/* --- CITY DISCOVERY SECTION --- */}
         <section className="glass-surface rounded-3xl p-8 sm:p-10 border border-[var(--color-border)]">
           <div className="max-w-2xl mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 font-['Outfit']">
               Explore Events by City
             </h2>
             <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-              Find live shows, concerts, and cultural gatherings happening in top cities across the country.
+              Find live shows, concerts, and cultural gatherings happening in top entertainment hubs.
             </p>
           </div>
 
@@ -205,8 +212,8 @@ export default function HomePage() {
           <section>
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)]">
-                  Explore Active Venues
+                <h2 className="text-xl sm:text-2xl font-bold text-white font-['Outfit']">
+                  Featured Arenas & Venues
                 </h2>
                 <p className="text-xs text-[var(--color-text-muted)] mt-1">
                   Popular stadiums, auditoriums, and performance arenas

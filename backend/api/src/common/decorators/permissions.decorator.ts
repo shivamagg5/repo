@@ -21,3 +21,6 @@ export const RequirePermissions = (...permissions: string[]) =>
  */
 export const PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
+
+export const REQUIRE_MFA_KEY = 'requireMfa';
+export const RequireMfa = () => SetMetadata(REQUIRE_MFA_KEY, true);

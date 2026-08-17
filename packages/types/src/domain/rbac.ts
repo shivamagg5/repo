@@ -137,6 +137,40 @@ export interface OrgMembershipContext {
 }
 
 // ---------------------------------------------------------------------------
-// Invitation status
+// Security & Health DTO Interfaces (Phase 13)
 // ---------------------------------------------------------------------------
-export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+export interface MfaSetupDto {
+  qrCodeUrl: string;
+  secretKey: string;
+  recoveryCodes: string[];
+}
+
+export interface MfaVerifyInput {
+  mfaToken: string;
+}
+
+export interface ReauthInput {
+  password?: string;
+  mfaCode?: string;
+}
+
+export interface ReauthResponseDto {
+  reauthToken: string;
+  expiresAt: string;
+}
+
+export interface SecurityPolicyDto {
+  mfaRequired: boolean;
+  rateLimitClass: string;
+  httpsEnforced: boolean;
+  corsOrigins: string[];
+}
+
+export interface HealthCheckReportDto {
+  status: 'ok' | 'degraded' | 'down';
+  timestamp: string;
+  uptimeSeconds: number;
+  databaseConnected: boolean;
+  redisConnected: boolean;
+  queueWorkersActive: boolean;
+}
