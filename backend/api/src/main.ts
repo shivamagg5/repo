@@ -19,7 +19,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // CORS — restrict origins in production
-  const corsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(',');
+  const corsEnv = process.env['CORS_ORIGINS'] ?? '*';
+  const corsOrigins = corsEnv === '*' ? true : corsEnv.split(',');
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
