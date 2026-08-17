@@ -228,6 +228,31 @@ class _ScannerLoginScreenState extends State<ScannerLoginScreen> {
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // Quick Demo Autofill Button
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _emailController.text = 'staff@eventplatform.com';
+                        _passwordController.text = 'Staff123!';
+                        _errorMessage = null;
+                      });
+                    },
+                    icon: const Icon(Icons.bolt_rounded, color: Color(0xFFA78BFA), size: 18),
+                    label: const Text(
+                      'Auto-Fill Demo Staff Credentials',
+                      style: TextStyle(color: Color(0xFFA78BFA), fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF4C1D95)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
