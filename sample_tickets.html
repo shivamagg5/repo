@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EventPlatform — 10 Sample Gate Entry Tickets</title>
+  <style>
+    :root {
+      --bg: #0B0E14;
+      --card-bg: #151922;
+      --card-border: #232936;
+      --primary: #7C3AED;
+      --accent: #EC4899;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 32px 20px 80px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #A78BFA, #F472B6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    .instructions {
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.4);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 14px;
+      color: #DDD6FE;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .ticket-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .ticket-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(124, 58, 237, 0.6);
+    }
+
+    .ticket-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+    }
+
+    .ticket-card.card-warning::before {
+      background: var(--warning);
+    }
+
+    .ticket-card.card-danger::before {
+      background: var(--danger);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 12px;
+    }
+
+    .badge-valid {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .badge-duplicate {
+      background: rgba(239, 68, 68, 0.2);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .badge-wrong-event {
+      background: rgba(245, 158, 11, 0.2);
+      color: #FBBF24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .badge-expired {
+      background: rgba(148, 163, 184, 0.2);
+      color: #CBD5E1;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .attendee-name {
+      font-size: 19px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+    }
+
+    .ticket-tier {
+      font-size: 13px;
+      color: #C084FC;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .qr-container {
+      background: #FFFFFF;
+      padding: 12px;
+      border-radius: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-container img {
+      display: block;
+      width: 180px;
+      height: 180px;
+      image-rendering: pixelated;
+    }
+
+    .ticket-note {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+
+    .ticket-meta {
+      width: 100%;
+      border-top: 1px dashed var(--card-border);
+      padding-top: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .ticket-meta span {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎟️ 10 Sample QR Entry Passes</h1>
+      <p>Point your phone scanner camera at any QR code on this screen to test live validation, anti-duplicate checks, and haptics!</p>
+    </div>
+
+    <div class="instructions">
+      <span style="font-size: 28px;">📱</span>
+      <div>
+        <strong>Scanner Ready:</strong> Point the camera at any card below. Valid passes flash <strong style="color: #34D399;">GREEN</strong>, duplicates flash <strong style="color: #F87171;">RED</strong>, and wrong events flash <strong style="color: #FBBF24;">AMBER</strong>!
+      </div>
+    </div>
+
+    <div class="grid" id="ticketGrid"></div>
+  </div>
+
+  <script>
+    const tickets = [
+      {
+        id: 'tkt-001',
+        name: 'Rahul Sharma',
+        tier: 'VIP Table Access (Tier 1)',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-vip-01',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-002',
+        name: 'Priya Patel',
+        tier: 'Female Early Bird Entry',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-early-02',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-003',
+        name: 'Aman Gupta',
+        tier: 'Couple Pass (2 Admitted)',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-couple-03',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-004',
+        name: 'Tanya Roy',
+        tier: 'General Admission',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-ga-04',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-005',
+        name: 'Kabir Mehta',
+        tier: 'Backstage Artist Guest',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-backstage-05',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-006',
+        name: 'Sneha Verma',
+        tier: 'VIP Deck Lounge',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-vip-06',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-007',
+        name: 'Rohan Deshmukh',
+        tier: 'General Admission (Phase 2)',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-ga-07',
+        badge: '🟢 VALID PASS',
+        badgeClass: 'badge-valid',
+        cardClass: '',
+        note: 'Expected: Instant Green Check-in'
+      },
+      {
+        id: 'tkt-008',
+        name: 'Ananya Iyer (Scan Twice)',
+        tier: 'Stag Entry Pass',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-stag-08',
+        badge: '🔴 TEST DUPLICATE',
+        badgeClass: 'badge-duplicate',
+        cardClass: 'card-danger',
+        note: 'Scan once: GREEN. Scan again: RED ALREADY USED!'
+      },
+      {
+        id: 'tkt-009',
+        name: 'Vikram Singh (Wrong Event)',
+        tier: 'Winter Carnival Pass',
+        eventId: 'evt-winter-2025',
+        tierId: 'tier-wrong-09',
+        badge: '🟡 WRONG EVENT',
+        badgeClass: 'badge-wrong-event',
+        cardClass: 'card-warning',
+        note: 'Expected: Amber "Wrong Event Scope"'
+      },
+      {
+        id: 'tkt-010',
+        name: 'Meera Nair (Expired)',
+        tier: 'Past Event Pass',
+        eventId: 'evt-summer-2026',
+        tierId: 'tier-expired-10',
+        expiresAt: '2024-01-01T00:00:00.000Z',
+        badge: '⚪ EXPIRED PASS',
+        badgeClass: 'badge-expired',
+        cardClass: 'card-warning',
+        note: 'Expected: Amber "Expired Pass"'
+      }
+    ];
+
+    const grid = document.getElementById('ticketGrid');
+
+    tickets.forEach((t) => {
+      const issuedAt = new Date().toISOString();
+      const expiresAt = t.expiresAt || 'none';
+      const sig = 'sig_' + Math.random().toString(36).substring(2, 15) + '_verified_token_sec';
+      const payload = `v1|${t.id}|${t.eventId}|${t.tierId}|${issuedAt}|${expiresAt}|v1`;
+      const qrData = `TICKET.${payload}.${sig}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=2&data=${encodeURIComponent(qrData)}`;
+
+      const card = document.createElement('div');
+      card.className = `ticket-card ${t.cardClass}`;
+      card.innerHTML = `
+        <span class="status-badge ${t.badgeClass}">${t.badge}</span>
+        <div class="attendee-name">${t.name}</div>
+        <div class="ticket-tier">${t.tier}</div>
+        <div class="qr-container">
+          <img src="${qrUrl}" alt="QR Code for ${t.name}" loading="eager" />
+        </div>
+        <div class="ticket-note">${t.note}</div>
+        <div class="ticket-meta">
+          <span>ID: ${t.id}</span>
+          <span>Event: ${t.eventId}</span>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
