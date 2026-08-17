@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/lime_button.dart';
+import '../../widgets/gradient_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -160,8 +160,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const SizedBox(height: 28),
 
                   // Submit Button
-                  LimeButton(
-                    label: 'Create Account',
+                  GradientButton(
+                    label: 'Create Account ✦',
                     isLoading: authState.isLoading,
                     onPressed: _handleRegister,
                   ),

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/lime_button.dart';
+import '../../widgets/gradient_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -129,8 +129,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 28),
 
-          LimeButton(
-            label: 'Send Recovery Email',
+          GradientButton(
+            label: 'Send Recovery Email ✦',
             isLoading: _isLoading,
             onPressed: _handleReset,
           ),
@@ -165,8 +165,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 32),
-          LimeButton(
-            label: 'Back to Sign In',
+          GradientButton(
+            label: 'Back to Sign In ✦',
             onPressed: () => context.go('/login'),
           ),
         ],

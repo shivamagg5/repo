@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/lime_button.dart';
+import '../../widgets/gradient_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final String? redirectTo;
@@ -174,8 +174,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 24),
 
                   // Submit Button
-                  LimeButton(
-                    label: 'Log In',
+                  GradientButton(
+                    label: 'Log In ✦',
                     isLoading: authState.isLoading,
                     onPressed: _handleLogin,
                   ),

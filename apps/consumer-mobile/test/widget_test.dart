@@ -21,7 +21,7 @@ void main() {
     );
 
     expect(find.text('Discover Events'), findsOneWidget);
-    expect(find.text('Find Your Next Adventure'), findsOneWidget);
+    expect(find.text('Find your next adventure ✦'), findsOneWidget);
     expect(find.text('Sign In'), findsOneWidget);
   });
 }
