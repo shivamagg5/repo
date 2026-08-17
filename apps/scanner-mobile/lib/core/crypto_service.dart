@@ -65,18 +65,18 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7Z5f80V274L+JgE66M50E4e4G76M
   /// Parse QR Token Structure:
   /// TICKET.{canonicalPayload}.{base64urlSignature}
   ParsedTicketCredential? parseQrToken(String qrToken) {
-    final parts = qrToken.split('.');
-    if (parts.length != 3) {
+    if (!qrToken.startsWith('TICKET.')) {
       return null;
     }
 
-    final header = parts[0];
-    if (header != 'TICKET') {
+    final firstDot = qrToken.indexOf('.');
+    final lastDot = qrToken.lastIndexOf('.');
+    if (firstDot == -1 || lastDot == -1 || firstDot == lastDot) {
       return null;
     }
 
-    final canonicalPayload = parts[1];
-    final signature = parts[2];
+    final canonicalPayload = qrToken.substring(firstDot + 1, lastDot);
+    final signature = qrToken.substring(lastDot + 1);
 
     final fields = canonicalPayload.split('|');
     if (fields.length != 7 || fields[0] != 'v1') {

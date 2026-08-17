@@ -339,8 +339,8 @@
     const grid = document.getElementById('ticketGrid');
 
     tickets.forEach((t) => {
-      const issuedAt = new Date().toISOString();
-      const expiresAt = t.expiresAt || 'none';
+      const issuedAt = Math.floor(Date.now() / 1000).toString();
+      const expiresAt = t.expiresAt ? Math.floor(new Date(t.expiresAt).getTime() / 1000).toString() : 'none';
       const sig = 'sig_' + Math.random().toString(36).substring(2, 15) + '_verified_token_sec';
       const payload = `v1|${t.id}|${t.eventId}|${t.tierId}|${issuedAt}|${expiresAt}|v1`;
       const qrData = `TICKET.${payload}.${sig}`;
