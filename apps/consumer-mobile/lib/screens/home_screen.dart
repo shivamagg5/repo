@@ -36,9 +36,12 @@ final _publicEventsProvider = FutureProvider.family<List<Map<String, dynamic>>, 
   });
   if (res.statusCode >= 200 && res.statusCode < 300) {
     final decoded = jsonDecode(res.body);
-    final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as List<dynamic>
-        : (decoded is List ? decoded : []);
+    final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
+        ? decoded['data']
+        : decoded;
+    final list = data is Map<String, dynamic> && data.containsKey('items')
+        ? data['items'] as List<dynamic>
+        : (data is List ? data : []);
     return list.cast<Map<String, dynamic>>();
   }
   throw Exception('Failed to load events (${res.statusCode})');

@@ -50,7 +50,7 @@ final apiServiceProvider = Provider<ApiService>((ref) {
   final authService = ref.watch(authServiceProvider);
   const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3001/api/v1',
+    defaultValue: 'https://event-platform-api-r4og.onrender.com/api/v1',
   );
   return ApiService(baseUrl: baseUrl, authService: authService);
 });
