@@ -242,3 +242,37 @@ class PillIndicatorPainter extends CustomPainter {
   bool shouldRepaint(PillIndicatorPainter old) =>
       old.activeIndex != activeIndex || old.color != color;
 }
+
+// ─── StaggeredListItem ───────────────────────────────────────────────────────
+
+/// Wraps a list card in a staggered FadeSlideIn entrance.
+/// Use with index to create a cascade entrance effect:
+///   delay = Duration(milliseconds: index * 80)
+///
+/// Applied to Upcoming Events, Trending Events, Tonight sections.
+class StaggeredListItem extends StatelessWidget {
+  const StaggeredListItem({
+    super.key,
+    required this.index,
+    required this.child,
+    this.baseDelayMs = 80,
+    this.maxDelayMs = 400,
+  });
+
+  final int index;
+  final Widget child;
+  final int baseDelayMs;
+  final int maxDelayMs;
+
+  @override
+  Widget build(BuildContext context) {
+    final delayMs = (index * baseDelayMs).clamp(0, maxDelayMs);
+    return FadeSlideIn(
+      delay: Duration(milliseconds: delayMs),
+      duration: const Duration(milliseconds: 480),
+      offsetY: 20,
+      child: child,
+    );
+  }
+}
+
