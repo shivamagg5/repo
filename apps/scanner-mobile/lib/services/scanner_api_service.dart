@@ -12,7 +12,10 @@ class ScannerApiService {
   final DeviceKeyService _deviceKeyService;
 
   ScannerApiService({
-    this.baseUrl = 'http://localhost:3001/api/v1',
+    this.baseUrl = const String.fromEnvironment(
+      'API_URL',
+      defaultValue: 'https://event-platform-api-r4og.onrender.com/api/v1',
+    ),
     DeviceKeyService? deviceKeyService,
   }) : _deviceKeyService = deviceKeyService ?? DeviceKeyService();
 

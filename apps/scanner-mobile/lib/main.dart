@@ -10,16 +10,22 @@ import 'services/scanner_auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/scan_screen.dart';
 
-const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const String _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+const String _supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://bthpeqgafgxomaqhjfrc.supabase.co',
+);
+const String _supabaseAnonKey = String.fromEnvironment(
+  'SUPABASE_ANON_KEY',
+  defaultValue: 'sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: _supabaseUrl.isNotEmpty ? _supabaseUrl : 'https://placeholder.supabase.co',
+    url: _supabaseUrl,
     // ignore: deprecated_member_use
-    anonKey: _supabaseAnonKey.isNotEmpty ? _supabaseAnonKey : 'placeholder-anon-key',
+    anonKey: _supabaseAnonKey,
   );
 
   runApp(
