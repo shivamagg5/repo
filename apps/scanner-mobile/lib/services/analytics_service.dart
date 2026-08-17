@@ -10,7 +10,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'scanner_auth_service.dart';
-import '../providers/scanner_provider.dart';
 
 const Set<String> scannerCanonicalEvents = {
   'scanner_login',
@@ -108,7 +107,7 @@ class ScannerAnalyticsService {
       'platform': _platform,
       'appVersion': _appVersion,
       'occurredAt': DateTime.now().toUtc().toIso8601String(),
-      if (cleanProps != null) 'properties': cleanProps,
+      'properties': ?cleanProps,
     };
 
     if (_queue.length >= maxQueueSize) {
