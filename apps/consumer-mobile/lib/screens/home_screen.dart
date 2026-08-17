@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import '../providers/auth_provider.dart';
+import '../providers/city_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/animations.dart';
 import '../widgets/event_card_large.dart';
@@ -21,15 +22,25 @@ import '../widgets/section_header.dart';
 import '../widgets/loading_state.dart';
 import '../widgets/error_state.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/city_selection_sheet.dart';
 
 // ── Data Provider: Public Events Feed ───────────────────────────────────────
 final _publicEventsProvider = FutureProvider.family<List<Map<String, dynamic>>, _EventQuery>((ref, query) async {
   final apiService = ref.watch(apiServiceProvider);
-  final uri = Uri.parse('${apiService.baseUrl}/public/events').replace(queryParameters: {
-    if (query.category != null) 'category': query.category!,
-    if (query.sort != null) 'sort': query.sort!,
+  final queryParams = <String, String>{
     'limit': query.limit.toString(),
-  });
+  };
+  if (query.category != null && query.category!.isNotEmpty && query.category != 'All') {
+    queryParams['category'] = query.category!;
+  }
+  if (query.city != null && query.city!.isNotEmpty && query.city != 'All India') {
+    queryParams['city'] = query.city!;
+  }
+  if (query.sort != null && query.sort!.isNotEmpty) {
+    queryParams['sort'] = query.sort!;
+  }
+
+  final uri = Uri.parse('${apiService.baseUrl}/public/events').replace(queryParameters: queryParams);
   final res = await http.get(uri, headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -66,18 +77,28 @@ final _categoriesProvider = FutureProvider<List<String>>((ref) async {
 
 class _EventQuery {
   final String? category;
+  final String? city;
   final String? sort;
   final int limit;
 
-  const _EventQuery({this.category, this.sort, this.limit = 10});
+  const _EventQuery({
+    this.category,
+    this.city,
+    this.sort,
+    this.limit = 10,
+  });
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _EventQuery && category == other.category && sort == other.sort && limit == other.limit;
+      other is _EventQuery &&
+          category == other.category &&
+          city == other.city &&
+          sort == other.sort &&
+          limit == other.limit;
 
   @override
-  int get hashCode => Object.hash(category, sort, limit);
+  int get hashCode => Object.hash(category, city, sort, limit);
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -93,12 +114,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
+    final selectedCity = ref.watch(selectedCityProvider);
+    final effectiveCity = selectedCity == 'All India' ? null : selectedCity;
     final categories = ref.watch(_categoriesProvider);
     final upcomingEvents = ref.watch(_publicEventsProvider(
-      _EventQuery(category: _selectedCategory, sort: 'date', limit: 5),
+      _EventQuery(category: _selectedCategory, city: effectiveCity, sort: 'date', limit: 5),
     ));
     final trendingEvents = ref.watch(_publicEventsProvider(
-      const _EventQuery(sort: 'newest', limit: 10),
+      _EventQuery(city: effectiveCity, sort: 'newest', limit: 10),
     ));
 
     return Scaffold(
@@ -119,7 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   duration: const Duration(milliseconds: 600),
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
@@ -140,96 +163,138 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Avatar circle
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _getInitials(authState),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Greeting + sub
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _getGreeting(authState),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
+                        // ── Top Sub-Bar: City Location Selector Pill & Action ────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            GestureDetector(
+                              onTap: () => CitySelectionSheet.show(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.28),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.location_on_rounded, color: AppColors.neonPink, size: 16),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      selectedCity,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
                                     ),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                'Find your next adventure ✦',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 18),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            if (authState.isAuthenticated)
+                              GestureDetector(
+                                onTap: () => context.push('/notifications'),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              )
+                            else
+                              GestureDetector(
+                                onTap: () => context.go('/login'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      color: AppColors.electricPurple,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                        // Right: notification or sign-in
-                        if (authState.isAuthenticated)
-                          GestureDetector(
-                            onTap: () => context.push('/notifications'),
-                            child: Container(
+                        const SizedBox(height: 16),
+
+                        // ── Profile Avatar & Greeting ───────────────────────────
+                        Row(
+                          children: [
+                            Container(
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                  width: 1.5,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.notifications_none_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          )
-                        else
-                          GestureDetector(
-                            onTap: () => context.go('/login'),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 9),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'Sign In',
-                                style: TextStyle(
-                                  color: AppColors.electricPurple,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                              child: Center(
+                                child: Text(
+                                  _getInitials(authState),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _getGreeting(authState),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 17,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Find your next adventure ✦',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -257,7 +322,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // ── Upcoming Events (large cards) ─────────────────────────
               SliverToBoxAdapter(
                 child: SectionHeader(
-                  title: 'Upcoming Events',
+                  title: selectedCity == 'All India' ? 'Upcoming Events' : 'Upcoming in $selectedCity',
                   onSeeAll: () => context.go('/search'),
                 ),
               ),
@@ -322,7 +387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // ── Trending Events (small horizontal cards) ──────────────
               SliverToBoxAdapter(
                 child: SectionHeader(
-                  title: 'Trending Events',
+                  title: selectedCity == 'All India' ? 'Trending Events' : 'Trending in $selectedCity',
                   onSeeAll: () => context.go('/search'),
                 ),
               ),

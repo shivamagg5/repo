@@ -11,10 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import '../../providers/auth_provider.dart';
+import '../../providers/city_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/city_selection_sheet.dart';
 import 'filters_sheet.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -57,10 +59,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     try {
       final apiService = ref.read(apiServiceProvider);
+      final selectedCity = ref.read(selectedCityProvider);
       final params = <String, String>{
         'limit': '30',
         'sort': _sort,
         if (_query.isNotEmpty) 'q': _query,
+        if (selectedCity.isNotEmpty && selectedCity != 'All India') 'city': selectedCity,
         'category': ?_category,
         'datePreset': ?_datePreset,
       };
@@ -125,6 +129,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedCity = ref.watch(selectedCityProvider);
+
+    ref.listen<String>(selectedCityProvider, (previous, next) {
+      if (previous != next) {
+        _fetchEvents();
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -180,25 +192,67 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
 
-            // ── Active Filter Tags ──────────────────────────────────────
-            if (_hasActiveFilters)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            // ── City & Active Filter Tags ──────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: SizedBox(
+                width: double.infinity,
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (_category != null) _buildFilterTag(_category!, () {
-                      setState(() => _category = null);
-                      _fetchEvents();
-                    }),
-                    if (_datePreset != null) _buildFilterTag(_datePreset!, () {
-                      setState(() => _datePreset = null);
-                      _fetchEvents();
-                    }),
+                    // Location Pill
+                    GestureDetector(
+                      onTap: () => CitySelectionSheet.show(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: selectedCity != 'All India'
+                                ? AppColors.electricPurple
+                                : AppColors.border,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on_rounded, color: AppColors.neonPink, size: 13),
+                            const SizedBox(width: 4),
+                            Text(
+                              selectedCity,
+                              style: TextStyle(
+                                color: selectedCity != 'All India'
+                                    ? AppColors.electricPurple
+                                    : AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary, size: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    if (_category != null)
+                      _buildFilterTag(_category!, () {
+                        setState(() => _category = null);
+                        _fetchEvents();
+                      }),
+                    if (_datePreset != null)
+                      _buildFilterTag(_datePreset!, () {
+                        setState(() => _datePreset = null);
+                        _fetchEvents();
+                      }),
                   ],
                 ),
               ),
+            ),
 
             const SizedBox(height: 16),
 
