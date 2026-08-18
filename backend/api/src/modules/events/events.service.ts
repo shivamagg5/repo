@@ -14,6 +14,7 @@ import {
   eventMedia,
   eventLineups,
   venues,
+  ticketTypes,
 } from '../../database/schema/index';
 import { AuditService } from '../../common/audit/audit.service';
 import { RbacService } from '../auth/rbac.service';
@@ -641,8 +642,15 @@ export class EventsService {
       .where(eq(eventLineups.eventId, event.id))
       .execute();
 
+    // Load active ticket tiers
+    const tiers = await this.db.db
+      .select()
+      .from(ticketTypes)
+      .where(and(eq(ticketTypes.eventId, event.id), eq(ticketTypes.status, 'active')))
+      .execute();
+
     // Non-blocking canonical analytics logging
-    this.logger.log(`[Analytics: event_view] eventId=${event.id} slug=${slug}`);
+    this.logger.log(`[Analytics: event_view] eventId=${event.id} slug=${slug} tiers=${tiers.length}`);
 
     return {
       id: event.id,
@@ -658,6 +666,24 @@ export class EventsService {
       venue: venuePublic,
       media: media.map((m) => ({ id: m.id, url: m.url, type: m.type, sortOrder: m.sortOrder })),
       lineup: lineup.map((l) => ({ id: l.id, name: l.name, role: l.role, sortOrder: l.sortOrder })),
+      ticketTypes: tiers.map((t) => ({
+        id: t.id,
+        eventId: t.eventId,
+        name: t.name,
+        description: t.description,
+        priceMinor: Number(t.priceMinor),
+        currency: t.currency,
+        quantity: t.quantity,
+        soldQuantity: t.soldQuantity,
+        reservedQuantity: t.reservedQuantity,
+        minPerOrder: t.minPerOrder,
+        maxPerOrder: t.maxPerOrder,
+        saleStartsAt: t.saleStartsAt ? t.saleStartsAt.toISOString() : null,
+        saleEndsAt: t.saleEndsAt ? t.saleEndsAt.toISOString() : null,
+        status: t.status,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+      })),
     };
   }
 

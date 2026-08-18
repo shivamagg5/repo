@@ -1,7 +1,7 @@
 // =============================================================================
 // Scanner Mobile — Scanner State & Riverpod Notifier
-// Orchestrates device registration, pairing, live camera scan processing,
-// offline cryptographic validation, SQLite queue synchronization, and feedback.
+// Orchestrates device registration, pairing, two-step Inspect-and-Approve
+// admission workflow, offline cryptographic validation, SQLite sync, and metrics.
 // =============================================================================
 
 import 'package:flutter/services.dart';
@@ -16,13 +16,66 @@ import '../services/analytics_service.dart';
 enum ScanProcessingStatus {
   idle,
   processing,
-  success,
-  alreadyUsed,
-  wrongEvent,
-  invalid,
-  expired,
-  offlineAccepted,
-  revoked,
+  inspecting,      // Step 1: Scanned & verified, showing details for staff review
+  success,         // Step 2: Approved & recorded in DB / SQLite
+  alreadyUsed,     // Denied: Ticket was already checked in
+  wrongEvent,      // Denied: Ticket for different event
+  invalid,         // Denied: Corrupt or forged signature
+  expired,         // Denied: Outside entry window
+  offlineAccepted, // Approved: Validated offline and queued for sync
+  revoked,         // Denied: Device revoked
+}
+
+class ScanHistoryItem {
+  final String ticketId;
+  final String attendeeName;
+  final String ticketTier;
+  final DateTime timestamp;
+  final ScanProcessingStatus status;
+  final String statusText;
+  final bool isOffline;
+
+  const ScanHistoryItem({
+    required this.ticketId,
+    required this.attendeeName,
+    required this.ticketTier,
+    required this.timestamp,
+    required this.status,
+    required this.statusText,
+    this.isOffline = false,
+  });
+}
+
+class TierStats {
+  final String name;
+  final int admitted;
+  final int capacity;
+
+  const TierStats({
+    required this.name,
+    required this.admitted,
+    required this.capacity,
+  });
+}
+
+class PendingInspection {
+  final String qrPayload;
+  final ParsedTicketCredential parsed;
+  final String attendeeName;
+  final String ticketTier;
+  final String ticketNumber;
+  final bool isOnlineCandidate;
+  final Map<String, dynamic>? serverInspectionData;
+
+  const PendingInspection({
+    required this.qrPayload,
+    required this.parsed,
+    required this.attendeeName,
+    required this.ticketTier,
+    required this.ticketNumber,
+    required this.isOnlineCandidate,
+    this.serverInspectionData,
+  });
 }
 
 class ScannerState {
@@ -40,13 +93,20 @@ class ScannerState {
   final bool isSyncing;
   final int pendingCount;
   final int validCount;
+  final int deniedCount;
   final ScanProcessingStatus scanStatus;
   final String statusMessage;
+  final PendingInspection? pendingInspection;
   final String? lastAttendeeName;
   final String? lastTicketType;
   final String? lastTicketNumber;
   final String? syncSummary;
   final String? errorMessage;
+  final List<ScanHistoryItem> history;
+  final Map<String, int> tierAdmissions;
+  final double zoomLevel;
+  final bool soundEnabled;
+  final bool hapticEnabled;
 
   const ScannerState({
     this.isInitialized = false,
@@ -63,13 +123,20 @@ class ScannerState {
     this.isSyncing = false,
     this.pendingCount = 0,
     this.validCount = 0,
+    this.deniedCount = 0,
     this.scanStatus = ScanProcessingStatus.idle,
     this.statusMessage = 'Point camera at attendee ticket QR code',
+    this.pendingInspection,
     this.lastAttendeeName,
     this.lastTicketType,
     this.lastTicketNumber,
     this.syncSummary,
     this.errorMessage,
+    this.history = const [],
+    this.tierAdmissions = const {},
+    this.zoomLevel = 1.0,
+    this.soundEnabled = true,
+    this.hapticEnabled = true,
   });
 
   ScannerState copyWith({
@@ -87,13 +154,21 @@ class ScannerState {
     bool? isSyncing,
     int? pendingCount,
     int? validCount,
+    int? deniedCount,
     ScanProcessingStatus? scanStatus,
     String? statusMessage,
+    PendingInspection? pendingInspection,
+    bool clearPendingInspection = false,
     String? lastAttendeeName,
     String? lastTicketType,
     String? lastTicketNumber,
     String? syncSummary,
     String? errorMessage,
+    List<ScanHistoryItem>? history,
+    Map<String, int>? tierAdmissions,
+    double? zoomLevel,
+    bool? soundEnabled,
+    bool? hapticEnabled,
   }) {
     return ScannerState(
       isInitialized: isInitialized ?? this.isInitialized,
@@ -110,13 +185,20 @@ class ScannerState {
       isSyncing: isSyncing ?? this.isSyncing,
       pendingCount: pendingCount ?? this.pendingCount,
       validCount: validCount ?? this.validCount,
+      deniedCount: deniedCount ?? this.deniedCount,
       scanStatus: scanStatus ?? this.scanStatus,
       statusMessage: statusMessage ?? this.statusMessage,
+      pendingInspection: clearPendingInspection ? null : (pendingInspection ?? this.pendingInspection),
       lastAttendeeName: lastAttendeeName ?? this.lastAttendeeName,
       lastTicketType: lastTicketType ?? this.lastTicketType,
       lastTicketNumber: lastTicketNumber ?? this.lastTicketNumber,
       syncSummary: syncSummary ?? this.syncSummary,
       errorMessage: errorMessage,
+      history: history ?? this.history,
+      tierAdmissions: tierAdmissions ?? this.tierAdmissions,
+      zoomLevel: zoomLevel ?? this.zoomLevel,
+      soundEnabled: soundEnabled ?? this.soundEnabled,
+      hapticEnabled: hapticEnabled ?? this.hapticEnabled,
     );
   }
 }
@@ -146,6 +228,8 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
   final OfflineQueueService _offlineQueueService;
   final ScannerAuthService _authService;
   final ScannerAnalyticsService? _analyticsService;
+
+  final Map<String, DateTime> _sessionScannedTickets = {};
 
   ScannerNotifier({
     required ScannerApiService apiService,
@@ -178,7 +262,6 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
         pendingCount: pending,
       );
     } else {
-      // Generate new device keypair
       final pubKey = await _deviceKeyService.generateAndStoreKeyPair();
       final authHeader = await _authService.getAuthorizationHeader();
       final token = authHeader?.replaceFirst('Bearer ', '');
@@ -187,7 +270,7 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
         final regRes = await _apiService.registerDevice(
           deviceIdentifier: 'Handheld-Scanner-${DateTime.now().millisecondsSinceEpoch}',
           publicKeyPem: pubKey,
-          deviceModel: 'Flutter-Scanner-v1',
+          deviceModel: 'Flutter-Scanner-Pro-v2',
           authToken: token,
         );
 
@@ -201,8 +284,7 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
           pendingCount: pending,
         );
       } catch (_) {
-        // Dev fallback if registration fails
-        const fallbackId = 'dev-scanner-fallback-01';
+        const fallbackId = 'dev-scanner-gate-01';
         await _deviceKeyService.saveRegisteredDeviceId(fallbackId);
         state = state.copyWith(
           isInitialized: true,
@@ -214,7 +296,7 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
     }
   }
 
-  /// Pair device to Event and Gate, retrieving and verifying the Event Authorization Package
+  /// Pair device to Event and Gate
   Future<bool> pairDevice({
     required String eventId,
     required String gateId,
@@ -241,7 +323,6 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
       final remotePkg = res['package'] is Map ? res['package'] as Map<String, dynamic> : res;
       final pkgSig = (res['packageSignature'] ?? remotePkg['packageSignature'] ?? 'verified-sig') as String;
 
-      // Cryptographically verify Event Authorization Package against Root Trust Key
       final isValid = _cryptoService.verifyAuthorizationPackage(
         packageData: remotePkg,
         packageSignature: pkgSig,
@@ -251,11 +332,8 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
         pkg = remotePkg;
         serverTicketKey = pkg['publicKeyPem'] as String? ?? CryptoService.rootTrustPublicKeyPem;
       }
-    } catch (_) {
-      // Offline fallback
-    }
+    } catch (_) {}
 
-    // Standalone / Offline cryptographic package fallback (works with zero server latency)
     pkg ??= {
       'eventId': eventId,
       'gateId': gateId,
@@ -283,10 +361,28 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
     state = state.copyWith(isOnline: isOnline);
   }
 
-  /// Process Scanned Barcode Payload through the full State Machine
+  void setZoomLevel(double zoom) {
+    state = state.copyWith(zoomLevel: zoom);
+  }
+
+  void toggleSound() {
+    state = state.copyWith(soundEnabled: !state.soundEnabled);
+  }
+
+  void toggleHaptics() {
+    state = state.copyWith(hapticEnabled: !state.hapticEnabled);
+  }
+
+  // ===========================================================================
+  // STEP 1: SCAN & INSPECT (Camera Freezes, Details Rendered for Staff Review)
+  // ===========================================================================
   Future<void> processScannedPayload(String qrPayload) async {
-    if (state.scanStatus == ScanProcessingStatus.processing) return;
+    if (state.scanStatus == ScanProcessingStatus.processing ||
+        state.scanStatus == ScanProcessingStatus.inspecting) {
+      return;
+    }
     if (state.eventId == null || state.gateId == null || state.deviceId == null) {
+      _triggerHaptics(ScanProcessingStatus.invalid);
       state = state.copyWith(
         scanStatus: ScanProcessingStatus.invalid,
         statusMessage: 'Scanner is not paired to an event/gate.',
@@ -295,165 +391,64 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
     }
 
     _analyticsService?.track('scan_started', eventId: state.eventId);
-    state = state.copyWith(scanStatus: ScanProcessingStatus.processing, statusMessage: 'Verifying credential...');
+    state = state.copyWith(
+      scanStatus: ScanProcessingStatus.processing,
+      statusMessage: 'Verifying digital credential...',
+    );
 
     final parsed = _cryptoService.parseQrToken(qrPayload);
 
-    // 1. Structure Verification
+    // 1. Structure Check
     if (parsed == null) {
-      HapticFeedback.vibrate();
-      _analyticsService?.track('scan_invalid', eventId: state.eventId, properties: {'reason': 'malformed_structure'});
-      state = state.copyWith(
-        scanStatus: ScanProcessingStatus.invalid,
-        statusMessage: 'INVALID TICKET — Format or structure corrupted',
-        lastAttendeeName: null,
-        lastTicketType: null,
+      _recordDenied(
+        ticketId: 'UNKNOWN',
+        attendeeName: 'Unknown',
+        ticketTier: 'Invalid Barcode',
+        status: ScanProcessingStatus.invalid,
+        message: 'INVALID TICKET — Format or structure corrupted',
       );
       return;
     }
 
-    // 2. Event Scope Check
-    if (parsed.eventId != state.eventId) {
-      HapticFeedback.vibrate();
-      _analyticsService?.track('scan_invalid', eventId: state.eventId, properties: {'reason': 'wrong_event'});
-      state = state.copyWith(
-        scanStatus: ScanProcessingStatus.wrongEvent,
-        statusMessage: 'WRONG EVENT — Ticket is issued for another event',
-        lastAttendeeName: null,
-        lastTicketType: null,
-      );
-      return;
-    }
-
-    // 3. Expiration Check
-    if (parsed.isExpired) {
-      HapticFeedback.vibrate();
-      _analyticsService?.track('scan_invalid', eventId: state.eventId, properties: {'reason': 'expired'});
-      state = state.copyWith(
-        scanStatus: ScanProcessingStatus.expired,
-        statusMessage: 'EXPIRED TICKET — Admission window has ended',
-        lastAttendeeName: null,
-        lastTicketType: null,
-      );
-      return;
-    }
-
-    // 4. Online or Offline Check-in Execution
-    if (state.isOnline) {
-      await _executeOnlineScan(qrPayload, parsed);
-    } else {
-      await _executeOfflineScan(qrPayload, parsed);
-    }
-  }
-
-  final Map<String, DateTime> _sessionScannedTickets = {};
-
-  String _getSampleAttendeeName(String ticketId) {
-    switch (ticketId) {
-      case 'tkt-001': return 'Rahul Sharma';
-      case 'tkt-002': return 'Priya Patel';
-      case 'tkt-003': return 'Aman Gupta';
-      case 'tkt-004': return 'Tanya Roy';
-      case 'tkt-005': return 'Kabir Mehta';
-      case 'tkt-006': return 'Sneha Verma';
-      case 'tkt-007': return 'Rohan Deshmukh';
-      case 'tkt-008': return 'Ananya Iyer';
-      default: return 'Verified Attendee';
-    }
-  }
-
-  String _getSampleTicketTier(String tierId) {
-    switch (tierId) {
-      case 'tier-vip-01': return 'VIP Table Access';
-      case 'tier-early-02': return 'Female Early Bird';
-      case 'tier-couple-03': return 'Couple Pass';
-      case 'tier-ga-04': return 'General Admission';
-      case 'tier-backstage-05': return 'Backstage VIP';
-      case 'tier-vip-06': return 'VIP Deck Lounge';
-      case 'tier-ga-07': return 'General Admission';
-      case 'tier-stag-08': return 'Stag Entry Pass';
-      default: return 'Event Pass';
-    }
-  }
-
-  Future<void> _executeOnlineScan(String qrPayload, ParsedTicketCredential parsed) async {
-    final authHeader = await _authService.getAuthorizationHeader();
-    final token = authHeader?.replaceFirst('Bearer ', '') ?? '';
-
-    try {
-      final res = await _apiService.scanTicketOnline(
-        qrPayload: qrPayload,
-        eventId: state.eventId!,
-        gateId: state.gateId!,
-        deviceId: state.deviceId!,
-        authToken: token,
-      );
-
-      final result = res['result'] as String? ?? 'invalid';
-
-      if (result == 'success') {
-        HapticFeedback.heavyImpact();
-        _analyticsService?.track('scan_success', eventId: state.eventId);
-        state = state.copyWith(
-          scanStatus: ScanProcessingStatus.success,
-          validCount: state.validCount + 1,
-          statusMessage: 'ACCESS GRANTED — Valid Admission',
-          lastAttendeeName: res['attendeeName'] ?? _getSampleAttendeeName(parsed.ticketId),
-          lastTicketType: res['ticketTypeName'] ?? _getSampleTicketTier(parsed.ticketTypeId),
-          lastTicketNumber: parsed.ticketId,
-        );
-      } else if (result == 'already_used') {
-        HapticFeedback.vibrate();
-        _analyticsService?.track('scan_already_used', eventId: state.eventId);
-        final prevTime = res['previousCheckinTime'] ?? 'earlier';
-        state = state.copyWith(
-          scanStatus: ScanProcessingStatus.alreadyUsed,
-          statusMessage: 'ALREADY USED — Ticket was previously scanned at $prevTime',
-          lastAttendeeName: res['attendeeName'] ?? _getSampleAttendeeName(parsed.ticketId),
-          lastTicketType: res['ticketTypeName'] ?? _getSampleTicketTier(parsed.ticketTypeId),
-          lastTicketNumber: parsed.ticketId,
-        );
-      } else if (result == 'wrong_event') {
-        HapticFeedback.vibrate();
-        _analyticsService?.track('scan_invalid', eventId: state.eventId, properties: {'reason': 'wrong_event'});
-        state = state.copyWith(
-          scanStatus: ScanProcessingStatus.wrongEvent,
-          statusMessage: 'WRONG EVENT — Ticket is not valid for this event',
-        );
-      } else if (result == 'revoked') {
-        HapticFeedback.vibrate();
-        _analyticsService?.track('device_revoked', eventId: state.eventId);
-        state = state.copyWith(
-          scanStatus: ScanProcessingStatus.revoked,
-          statusMessage: 'DEVICE REVOKED — Scanner credentials revoked by server',
-        );
-      } else {
-        // Fall back to offline validation for demo or offline passes
-        await _executeOfflineScan(qrPayload, parsed);
-      }
-    } catch (_) {
-      // Network failure during online scan -> fallback to offline acceptance
-      await _executeOfflineScan(qrPayload, parsed);
-    }
-  }
-
-  Future<void> _executeOfflineScan(String qrPayload, ParsedTicketCredential parsed) async {
-    // 1. Session Duplicate Check (Anti-Scalping / Screenshot sharing)
+    // 2. Session Duplicate Check (Anti-Passback)
     if (_sessionScannedTickets.containsKey(parsed.ticketId)) {
       final prevTime = _sessionScannedTickets[parsed.ticketId]!;
       final timeStr = "${prevTime.hour.toString().padLeft(2, '0')}:${prevTime.minute.toString().padLeft(2, '0')}:${prevTime.second.toString().padLeft(2, '0')}";
-      HapticFeedback.vibrate();
-      _analyticsService?.track('scan_already_used', eventId: state.eventId);
-      state = state.copyWith(
-        scanStatus: ScanProcessingStatus.alreadyUsed,
-        statusMessage: 'ALREADY SCANNED — First admitted at $timeStr',
-        lastAttendeeName: _getSampleAttendeeName(parsed.ticketId),
-        lastTicketType: _getSampleTicketTier(parsed.ticketTypeId),
-        lastTicketNumber: parsed.ticketId,
+      _recordDenied(
+        ticketId: parsed.ticketId,
+        attendeeName: _getSampleAttendeeName(parsed.ticketId),
+        ticketTier: _getSampleTicketTier(parsed.ticketTypeId),
+        status: ScanProcessingStatus.alreadyUsed,
+        message: 'ALREADY SCANNED — First admitted at $timeStr',
       );
       return;
     }
 
+    // 3. Event Scope Check
+    if (parsed.eventId != state.eventId) {
+      _recordDenied(
+        ticketId: parsed.ticketId,
+        attendeeName: _getSampleAttendeeName(parsed.ticketId),
+        ticketTier: _getSampleTicketTier(parsed.ticketTypeId),
+        status: ScanProcessingStatus.wrongEvent,
+        message: 'WRONG EVENT — Ticket is issued for another event',
+      );
+      return;
+    }
+
+    // 4. Expiration Check
+    if (parsed.isExpired) {
+      _recordDenied(
+        ticketId: parsed.ticketId,
+        attendeeName: _getSampleAttendeeName(parsed.ticketId),
+        ticketTier: _getSampleTicketTier(parsed.ticketTypeId),
+        status: ScanProcessingStatus.expired,
+        message: 'EXPIRED TICKET — Admission window has ended',
+      );
+      return;
+    }
+
+    // 5. Cryptographic Signature Validation
     final serverKey = state.serverTicketPublicKeyPem ?? CryptoService.rootTrustPublicKeyPem;
     final isCryptoValid = _cryptoService.verifyTicketOffline(
       credential: parsed,
@@ -461,45 +456,208 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
       serverTicketPublicKeyPem: serverKey,
     );
 
-    if (!isCryptoValid) {
-      HapticFeedback.vibrate();
-      _analyticsService?.track('scan_invalid', eventId: state.eventId, properties: {'reason': 'offline_signature_failed'});
-      state = state.copyWith(
-        scanStatus: ScanProcessingStatus.invalid,
-        statusMessage: 'INVALID TICKET — Signature verification failed',
+    if (!isCryptoValid && !state.isOnline) {
+      _recordDenied(
+        ticketId: parsed.ticketId,
+        attendeeName: _getSampleAttendeeName(parsed.ticketId),
+        ticketTier: _getSampleTicketTier(parsed.ticketTypeId),
+        status: ScanProcessingStatus.invalid,
+        message: 'INVALID SIGNATURE — Cryptographic verification failed',
       );
       return;
     }
 
-    // Mark ticket as admitted in current session
-    _sessionScannedTickets[parsed.ticketId] = DateTime.now();
+    // Determine attendee name & ticket tier
+    final attendeeName = _getSampleAttendeeName(parsed.ticketId);
+    final ticketTier = _getSampleTicketTier(parsed.ticketTypeId);
 
-    // Enqueue in SQLite offline queue with unique syncId
-    final syncId = 'sync-${DateTime.now().millisecondsSinceEpoch}-${parsed.ticketId}';
-    final record = OfflineScanRecord(
-      syncId: syncId,
-      qrPayload: qrPayload,
-      ticketId: parsed.ticketId,
-      eventId: state.eventId!,
-      gateId: state.gateId!,
-      deviceId: state.deviceId!,
-      scannedAt: DateTime.now().toUtc().toIso8601String(),
-      localVerificationResult: 'offline_accepted',
+    // Provide light review haptic feedback
+    if (state.hapticEnabled) {
+      HapticFeedback.mediumImpact();
+    }
+
+    // Transition to INSPECTING state (camera stays paused, details shown to staff)
+    state = state.copyWith(
+      scanStatus: ScanProcessingStatus.inspecting,
+      statusMessage: 'PASS VERIFIED — Review details and tap Approve to admit',
+      pendingInspection: PendingInspection(
+        qrPayload: qrPayload,
+        parsed: parsed,
+        attendeeName: attendeeName,
+        ticketTier: ticketTier,
+        ticketNumber: parsed.ticketId,
+        isOnlineCandidate: state.isOnline,
+      ),
+      lastAttendeeName: attendeeName,
+      lastTicketType: ticketTier,
+      lastTicketNumber: parsed.ticketId,
+    );
+  }
+
+  // ===========================================================================
+  // STEP 2: APPROVE & ADMIT (Officially records check-in and updates counters)
+  // ===========================================================================
+  Future<void> approveAndAdmit() async {
+    final pending = state.pendingInspection;
+    if (pending == null) return;
+
+    state = state.copyWith(
+      scanStatus: ScanProcessingStatus.processing,
+      statusMessage: 'Recording check-in...',
     );
 
-    await _offlineQueueService.enqueueScan(record);
-    final pending = await _offlineQueueService.getPendingCount();
+    // Record in local session cache immediately (prevents duplicate admission)
+    _sessionScannedTickets[pending.parsed.ticketId] = DateTime.now();
 
-    HapticFeedback.heavyImpact();
-    _analyticsService?.track('offline_scan', eventId: state.eventId);
+    final authHeader = await _authService.getAuthorizationHeader();
+    final token = authHeader?.replaceFirst('Bearer ', '') ?? '';
+
+    bool recordedOnline = false;
+
+    if (state.isOnline) {
+      try {
+        final res = await _apiService.scanTicketOnline(
+          qrPayload: pending.qrPayload,
+          eventId: state.eventId!,
+          gateId: state.gateId!,
+          deviceId: state.deviceId!,
+          authToken: token,
+        );
+
+        final result = res['result'] as String? ?? 'invalid';
+
+        if (result == 'success') {
+          recordedOnline = true;
+        } else if (result == 'already_used') {
+          _recordDenied(
+            ticketId: pending.parsed.ticketId,
+            attendeeName: pending.attendeeName,
+            ticketTier: pending.ticketTier,
+            status: ScanProcessingStatus.alreadyUsed,
+            message: 'ALREADY USED — Ticket was already admitted on server',
+          );
+          return;
+        }
+      } catch (_) {
+        // Fallback to offline admission queue
+      }
+    }
+
+    if (!recordedOnline) {
+      // Enqueue in SQLite offline queue
+      final syncId = 'sync-${DateTime.now().millisecondsSinceEpoch}-${pending.parsed.ticketId}';
+      final record = OfflineScanRecord(
+        syncId: syncId,
+        qrPayload: pending.qrPayload,
+        ticketId: pending.parsed.ticketId,
+        eventId: state.eventId!,
+        gateId: state.gateId!,
+        deviceId: state.deviceId!,
+        scannedAt: DateTime.now().toUtc().toIso8601String(),
+        localVerificationResult: 'offline_accepted',
+      );
+      await _offlineQueueService.enqueueScan(record);
+    }
+
+    final pendingCount = await _offlineQueueService.getPendingCount();
+
+    // Success Haptics & Analytics
+    _triggerHaptics(ScanProcessingStatus.success);
+    _analyticsService?.track('scan_approved', eventId: state.eventId);
+
+    // Update tier distribution
+    final updatedTiers = Map<String, int>.from(state.tierAdmissions);
+    updatedTiers[pending.ticketTier] = (updatedTiers[pending.ticketTier] ?? 0) + 1;
+
+    // Add to Recent Scan History
+    final historyItem = ScanHistoryItem(
+      ticketId: pending.parsed.ticketId,
+      attendeeName: pending.attendeeName,
+      ticketTier: pending.ticketTier,
+      timestamp: DateTime.now(),
+      status: recordedOnline ? ScanProcessingStatus.success : ScanProcessingStatus.offlineAccepted,
+      statusText: recordedOnline ? 'Admitted (Online)' : 'Admitted (Offline Queued)',
+      isOffline: !recordedOnline,
+    );
+
     state = state.copyWith(
-      scanStatus: ScanProcessingStatus.success,
+      scanStatus: recordedOnline ? ScanProcessingStatus.success : ScanProcessingStatus.offlineAccepted,
       validCount: state.validCount + 1,
-      pendingCount: pending,
-      statusMessage: 'ACCESS GRANTED — Valid Admission (Offline Verified)',
-      lastAttendeeName: _getSampleAttendeeName(parsed.ticketId),
-      lastTicketType: _getSampleTicketTier(parsed.ticketTypeId),
-      lastTicketNumber: parsed.ticketId,
+      pendingCount: pendingCount,
+      statusMessage: recordedOnline
+          ? 'ADMITTED & RECORDED — Valid Entry'
+          : 'ADMITTED & RECORDED (Offline Queued)',
+      clearPendingInspection: true,
+      history: [historyItem, ...state.history].take(50).toList(),
+      tierAdmissions: updatedTiers,
+    );
+  }
+
+  /// Reject / Deny admission manually
+  void rejectCurrentInspection(String reason) {
+    final pending = state.pendingInspection;
+    if (pending == null) return;
+
+    _recordDenied(
+      ticketId: pending.parsed.ticketId,
+      attendeeName: pending.attendeeName,
+      ticketTier: pending.ticketTier,
+      status: ScanProcessingStatus.invalid,
+      message: 'DENIED BY GATE STAFF — $reason',
+    );
+  }
+
+  void _recordDenied({
+    required String ticketId,
+    required String attendeeName,
+    required String ticketTier,
+    required ScanProcessingStatus status,
+    required String message,
+  }) {
+    _triggerHaptics(status);
+    _analyticsService?.track('scan_denied', eventId: state.eventId, properties: {'reason': message});
+
+    final historyItem = ScanHistoryItem(
+      ticketId: ticketId,
+      attendeeName: attendeeName,
+      ticketTier: ticketTier,
+      timestamp: DateTime.now(),
+      status: status,
+      statusText: message,
+    );
+
+    state = state.copyWith(
+      scanStatus: status,
+      deniedCount: state.deniedCount + 1,
+      statusMessage: message,
+      lastAttendeeName: attendeeName,
+      lastTicketType: ticketTier,
+      lastTicketNumber: ticketId,
+      clearPendingInspection: true,
+      history: [historyItem, ...state.history].take(50).toList(),
+    );
+  }
+
+  void _triggerHaptics(ScanProcessingStatus status) {
+    if (!state.hapticEnabled) return;
+    if (status == ScanProcessingStatus.success || status == ScanProcessingStatus.offlineAccepted) {
+      HapticFeedback.heavyImpact();
+    } else {
+      HapticFeedback.vibrate();
+    }
+  }
+
+  // ===========================================================================
+  // STEP 3: RESET FOR NEXT ATTENDEE ("Scan Next Ticket")
+  // ===========================================================================
+  void resetScanState() {
+    state = state.copyWith(
+      scanStatus: ScanProcessingStatus.idle,
+      statusMessage: 'Point camera at attendee ticket QR code',
+      clearPendingInspection: true,
+      lastAttendeeName: null,
+      lastTicketType: null,
+      lastTicketNumber: null,
     );
   }
 
@@ -542,24 +700,42 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
       state = state.copyWith(
         isSyncing: false,
         pendingCount: remaining,
-        syncSummary: 'Sync complete: ${successList.length} admitted, ${conflictList.length} conflicts reconciled.',
+        syncSummary: 'Sync complete: ${successList.length} admitted, ${conflictList.length} conflicts.',
       );
     } catch (err) {
       state = state.copyWith(
         isSyncing: false,
-        syncSummary: 'Sync failed: $err. Scans remain safely queued.',
+        syncSummary: 'Sync failed: $err. Scans safely stored in local queue.',
       );
     }
   }
 
-  /// Reset scan result state for the next attendee
-  void resetScanState() {
-    state = state.copyWith(
-      scanStatus: ScanProcessingStatus.idle,
-      statusMessage: 'Point camera at attendee ticket QR code',
-      lastAttendeeName: null,
-      lastTicketType: null,
-      lastTicketNumber: null,
-    );
+  String _getSampleAttendeeName(String ticketId) {
+    switch (ticketId) {
+      case 'd0000000-0000-0000-0000-000000000001':
+      case 'tkt-001': return 'Rahul Sharma';
+      case 'd0000000-0000-0000-0000-000000000002':
+      case 'tkt-002': return 'Priya Patel';
+      case 'd0000000-0000-0000-0000-000000000003':
+      case 'tkt-003': return 'Aman Gupta';
+      case 'tkt-004': return 'Tanya Roy';
+      case 'tkt-005': return 'Kabir Mehta';
+      case 'tkt-006': return 'Sneha Verma';
+      case 'tkt-007': return 'Rohan Deshmukh';
+      case 'tkt-008': return 'Ananya Iyer';
+      default: return 'Admitted Attendee';
+    }
+  }
+
+  String _getSampleTicketTier(String tierId) {
+    switch (tierId) {
+      case 'd0000000-0000-0000-0000-000000000001':
+      case 'tier-ga-01': return 'General Admission — Early Bird';
+      case 'd0000000-0000-0000-0000-000000000002':
+      case 'tier-vip-02': return 'VIP Elevated Deck Pass';
+      case 'd0000000-0000-0000-0000-000000000003':
+      case 'tier-backstage-03': return 'Backstage Access & Meet & Greet';
+      default: return 'General Admission';
+    }
   }
 }

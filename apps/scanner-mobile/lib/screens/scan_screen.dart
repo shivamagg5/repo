@@ -1,15 +1,19 @@
 // =============================================================================
 // Scanner Mobile — Production Camera QR Scanner Screen
-// Integrates MobileScanner with local cryptographic verification, DeviceAuthGuard
-// online check-in, SQLite offline queue synchronization, and accessible feedback.
+// Two-Step Inspect-and-Approve Admission Workflow:
+//   1. Scan QR -> Camera Pauses -> Attendee Details Card Displayed for Review
+//   2. Staff Taps "Approve & Admit" -> Recorded in DB/SQLite -> Admitted Confirmed
+//   3. Staff Taps "Scan Next Ticket ->" -> Camera Resumes for Next Attendee
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../core/scanner_colors.dart';
 import '../providers/scanner_provider.dart';
 import '../services/scanner_auth_service.dart';
 import 'attendee_lookup_sheet.dart';
+import 'gate_metrics_sheet.dart';
 import 'login_screen.dart';
 import 'pairing_screen.dart';
 
@@ -20,9 +24,11 @@ class ScanScreen extends ConsumerStatefulWidget {
   ConsumerState<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends ConsumerState<ScanScreen> {
+class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProviderStateMixin {
   late final MobileScannerController _cameraController;
   bool _isTorchOn = false;
+  double _currentZoom = 1.0;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
@@ -32,17 +38,24 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       facing: CameraFacing.back,
       torchEnabled: false,
     );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _cameraController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   void _onDetect(BarcodeCapture capture) {
     final scannerState = ref.read(scannerProvider);
-    if (scannerState.scanStatus == ScanProcessingStatus.processing) return;
+    // Ignore camera detections while reviewing or processing an attendee
+    if (scannerState.scanStatus != ScanProcessingStatus.idle) return;
 
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
@@ -53,42 +66,44 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     }
   }
 
-  Color _getResultColor(ScanProcessingStatus status) {
+  Color _getStatusAccentColor(ScanProcessingStatus status) {
     switch (status) {
+      case ScanProcessingStatus.inspecting:
+        return ScannerColors.electricPurpleLight;
       case ScanProcessingStatus.success:
-        return const Color(0xFF059669); // Green
+      case ScanProcessingStatus.offlineAccepted:
+        return ScannerColors.success;
       case ScanProcessingStatus.alreadyUsed:
       case ScanProcessingStatus.revoked:
-        return const Color(0xFFDC2626); // Red
+        return ScannerColors.danger;
       case ScanProcessingStatus.wrongEvent:
       case ScanProcessingStatus.invalid:
       case ScanProcessingStatus.expired:
-        return const Color(0xFFD97706); // Amber
-      case ScanProcessingStatus.offlineAccepted:
-        return const Color(0xFF0284C7); // Cyan/Blue
+        return ScannerColors.warning;
       default:
-        return const Color(0xFF1E293B);
+        return ScannerColors.border;
     }
   }
 
-  IconData _getResultIcon(ScanProcessingStatus status) {
+  IconData _getStatusIcon(ScanProcessingStatus status) {
     switch (status) {
+      case ScanProcessingStatus.inspecting:
+        return Icons.verified_user_rounded;
       case ScanProcessingStatus.success:
+      case ScanProcessingStatus.offlineAccepted:
         return Icons.check_circle_rounded;
       case ScanProcessingStatus.alreadyUsed:
-        return Icons.error_rounded;
+        return Icons.history_rounded;
       case ScanProcessingStatus.wrongEvent:
         return Icons.wrong_location_rounded;
       case ScanProcessingStatus.invalid:
         return Icons.block_rounded;
       case ScanProcessingStatus.expired:
         return Icons.timer_off_rounded;
-      case ScanProcessingStatus.offlineAccepted:
-        return Icons.cloud_done_rounded;
       case ScanProcessingStatus.revoked:
         return Icons.security_update_warning_rounded;
       default:
-        return Icons.qr_code_scanner;
+        return Icons.qr_code_scanner_rounded;
     }
   }
 
@@ -101,24 +116,53 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       return const PairingScreen();
     }
 
-    final isResultActive = scannerState.scanStatus != ScanProcessingStatus.idle &&
-        scannerState.scanStatus != ScanProcessingStatus.processing;
+    final isInspecting = scannerState.scanStatus == ScanProcessingStatus.inspecting;
+    final isSuccess = scannerState.scanStatus == ScanProcessingStatus.success ||
+        scannerState.scanStatus == ScanProcessingStatus.offlineAccepted;
+    final isDenied = scannerState.scanStatus == ScanProcessingStatus.alreadyUsed ||
+        scannerState.scanStatus == ScanProcessingStatus.wrongEvent ||
+        scannerState.scanStatus == ScanProcessingStatus.invalid ||
+        scannerState.scanStatus == ScanProcessingStatus.expired ||
+        scannerState.scanStatus == ScanProcessingStatus.revoked;
+    final isReviewCardActive = isInspecting || isSuccess || isDenied;
+
+    final accentColor = _getStatusAccentColor(scannerState.scanStatus);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090D16),
+      backgroundColor: ScannerColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111827),
+        backgroundColor: ScannerColors.surface,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              scannerState.gateName ?? 'Gate Scanner',
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Text(
+                  scannerState.gateName ?? 'Gate Scanner',
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: scannerState.isOnline ? ScannerColors.successSubtle : ScannerColors.warningSubtle,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    scannerState.isOnline ? 'ONLINE' : 'OFFLINE',
+                    style: TextStyle(
+                      color: scannerState.isOnline ? ScannerColors.success : ScannerColors.warning,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
             Text(
-              '${scannerState.eventTitle ?? 'Event'} · Dev: ${scannerState.deviceId?.substring(0, 8) ?? 'scanner'}',
-              style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+              '${scannerState.eventTitle ?? 'Event'} · Dev #${scannerState.deviceId?.substring(0, 8) ?? 'scanner'}',
+              style: const TextStyle(color: ScannerColors.textSecondary, fontSize: 11),
             ),
           ],
         ),
@@ -126,29 +170,31 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           // Flashlight Toggle
           IconButton(
             icon: Icon(
-              _isTorchOn ? Icons.flash_on : Icons.flash_off,
-              color: _isTorchOn ? const Color(0xFFFBBF24) : Colors.grey,
+              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              color: _isTorchOn ? ScannerColors.warningLight : ScannerColors.textMuted,
             ),
-            tooltip: 'Flashlight',
+            tooltip: 'Toggle Flashlight',
             onPressed: () async {
               await _cameraController.toggleTorch();
               setState(() => _isTorchOn = !_isTorchOn);
             },
           ),
-          // Online / Offline Toggle
+          // Analytics & Stats Sheet
           IconButton(
-            icon: Icon(
-              scannerState.isOnline ? Icons.wifi : Icons.wifi_off,
-              color: scannerState.isOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-            ),
-            tooltip: scannerState.isOnline ? 'Online Mode (Tap for Offline)' : 'Offline Mode (Tap for Online)',
+            icon: const Icon(Icons.bar_chart_rounded, color: ScannerColors.electricPurpleLight),
+            tooltip: 'Gate Analytics & History',
             onPressed: () {
-              ref.read(scannerProvider.notifier).toggleOnline(!scannerState.isOnline);
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const GateMetricsSheet(),
+              );
             },
           ),
           // Logout
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
+            icon: const Icon(Icons.logout_rounded, color: ScannerColors.danger),
             tooltip: 'Sign Out',
             onPressed: () async {
               final authService = BasicScannerAuthService();
@@ -164,10 +210,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ),
       body: Column(
         children: [
-          // Connectivity & Sync Status Banner
+          // Status & Sync Banner
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
             color: scannerState.isOnline ? const Color(0xFF064E3B) : const Color(0xFF78350F),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,16 +221,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: scannerState.isOnline ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+                        color: scannerState.isOnline ? ScannerColors.successLight : ScannerColors.warningLight,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      scannerState.isOnline ? 'ONLINE — Real-time DB Gate' : 'OFFLINE MODE — Local Crypto Validation',
+                      scannerState.isOnline ? 'Real-time Server Verification' : 'Offline Crypto Mode (Local Keys)',
                       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -194,14 +240,19 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.black38,
+                      color: Colors.black45,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       scannerState.isSyncing
                           ? 'Syncing...'
-                          : 'Pending Sync: ${scannerState.pendingCount} 🔄',
-                      style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                          : 'Queue: ${scannerState.pendingCount} 🔄',
+                      style: const TextStyle(
+                        color: ScannerColors.textPrimary,
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -209,31 +260,22 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ),
           ),
 
-          if (scannerState.syncSummary != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-              color: const Color(0xFF1E1B4B),
-              child: Text(
-                scannerState.syncSummary!,
-                style: const TextStyle(color: Color(0xFFC7D2FE), fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
-            ),
-
-          // Camera Viewfinder & Real Scanning Layer
+          // Camera Viewfinder & Interactive Overlay
           Expanded(
             child: Stack(
               children: [
-                // Live Camera Stream
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _getResultColor(scannerState.scanStatus), width: 3),
+                // Live Camera Layer
+                Container(
+                  margin: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isReviewCardActive ? accentColor : ScannerColors.border,
+                      width: isReviewCardActive ? 3 : 1.5,
                     ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
                     child: MobileScanner(
                       controller: _cameraController,
                       onDetect: _onDetect,
@@ -241,49 +283,128 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   ),
                 ),
 
-                // Viewfinder Reticle Overlay
-                Center(
+                // Viewfinder Reticle (Active when idle)
+                if (scannerState.scanStatus == ScanProcessingStatus.idle)
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (context, child) {
+                        return Container(
+                          width: 230 + (_pulseController.value * 10),
+                          height: 230 + (_pulseController.value * 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: ScannerColors.electricPurpleLight.withValues(alpha: 0.6 + (_pulseController.value * 0.4)),
+                              width: 2.5,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Stack(
+                            children: [
+                              // Top-left corner bracket
+                              Positioned(top: 0, left: 0, child: _buildCorner(0)),
+                              Positioned(top: 0, right: 0, child: _buildCorner(1)),
+                              Positioned(bottom: 0, left: 0, child: _buildCorner(2)),
+                              Positioned(bottom: 0, right: 0, child: _buildCorner(3)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                // Zoom Level Controls
+                Positioned(
+                  top: 24,
+                  right: 24,
                   child: Container(
-                    width: 240,
-                    height: 240,
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _getResultColor(scannerState.scanStatus).withValues(alpha: 0.8),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildZoomButton('1x', 1.0),
+                        _buildZoomButton('1.5x', 1.5),
+                        _buildZoomButton('2x', 2.0),
+                      ],
                     ),
                   ),
                 ),
 
-                // Scan Result Overlay Card
-                if (isResultActive)
-                  Positioned(
-                    bottom: 24,
-                    left: 24,
-                    right: 24,
+                // Processing Spinner Overlay
+                if (scannerState.scanStatus == ScanProcessingStatus.processing)
+                  Center(
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       decoration: BoxDecoration(
-                        color: _getResultColor(scannerState.scanStatus).withValues(alpha: 0.95),
-                        borderRadius: BorderRadius.circular(18),
+                        color: Colors.black.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: ScannerColors.electricPurple),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: ScannerColors.electricPurpleLight, strokeWidth: 2.5),
+                          ),
+                          SizedBox(width: 14),
+                          Text(
+                            'Verifying Pass...',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // =============================================================
+                // TWO-STEP INSPECTION & APPROVAL CARD (User Requirement)
+                // =============================================================
+                if (isReviewCardActive)
+                  Positioned(
+                    bottom: 20,
+                    left: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: ScannerColors.surface.withValues(alpha: 0.98),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: accentColor, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
+                            color: accentColor.withValues(alpha: 0.35),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Top Status Badge & Icon
                           Row(
                             children: [
-                              Icon(
-                                _getResultIcon(scannerState.scanStatus),
-                                color: Colors.white,
-                                size: 32,
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.18),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _getStatusIcon(scannerState.scanStatus),
+                                  color: accentColor,
+                                  size: 26,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -291,45 +412,161 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      scannerState.statusMessage,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
+                                      isInspecting
+                                          ? 'REVIEW ATTENDEE PASS'
+                                          : isSuccess
+                                              ? 'ADMITTED SUCCESSFULLY'
+                                              : 'ADMISSION DENIED',
+                                      style: TextStyle(
+                                        color: accentColor,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.2,
                                       ),
                                     ),
-                                    if (scannerState.lastAttendeeName != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Attendee: ${scannerState.lastAttendeeName}',
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      scannerState.statusMessage,
+                                      style: const TextStyle(
+                                        color: ScannerColors.textPrimary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    ],
-                                    if (scannerState.lastTicketType != null) ...[
-                                      Text(
-                                        'Tier: ${scannerState.lastTicketType}',
-                                        style: const TextStyle(color: Color(0xFFE0E7FF), fontSize: 11),
-                                      ),
-                                    ],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () => ref.read(scannerProvider.notifier).resetScanState(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              child: const Text('Next Attendee →', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 14),
+
+                          // Attendee & Ticket Info Container
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: ScannerColors.card,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: ScannerColors.border),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Attendee Name', style: TextStyle(color: ScannerColors.textSecondary, fontSize: 12)),
+                                    Text(
+                                      scannerState.lastAttendeeName ?? scannerState.pendingInspection?.attendeeName ?? 'Attendee',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(color: ScannerColors.border, height: 14),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Ticket Tier', style: TextStyle(color: ScannerColors.textSecondary, fontSize: 12)),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: ScannerColors.electricPurpleSubtle,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        scannerState.lastTicketType ?? scannerState.pendingInspection?.ticketTier ?? 'General',
+                                        style: const TextStyle(
+                                          color: ScannerColors.electricPurpleLight,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (scannerState.lastTicketNumber != null) ...[
+                                  const Divider(color: ScannerColors.border, height: 14),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('Ticket Reference', style: TextStyle(color: ScannerColors.textSecondary, fontSize: 12)),
+                                      Text(
+                                        '#${scannerState.lastTicketNumber!.length > 12 ? scannerState.lastTicketNumber!.substring(0, 12) : scannerState.lastTicketNumber}',
+                                        style: const TextStyle(
+                                          color: ScannerColors.textPrimary,
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
+                          const SizedBox(height: 14),
+
+                          // ===================================================
+                          // ACTION BUTTONS BASED ON STEP
+                          // ===================================================
+
+                          // STEP 1: Inspecting -> Show "Approve & Admit" + "Reject"
+                          if (isInspecting)
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => ref.read(scannerProvider.notifier).approveAndAdmit(),
+                                    icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+                                    label: const Text(
+                                      'Approve & Admit',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: ScannerColors.success,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      elevation: 4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: OutlinedButton(
+                                    onPressed: () => ref.read(scannerProvider.notifier).rejectCurrentInspection('Staff Rejected'),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: ScannerColors.danger),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    child: const Text(
+                                      'Reject',
+                                      style: TextStyle(color: ScannerColors.danger, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                          // STEP 2 & 3: Success or Denied -> Show "Scan Next Ticket ->"
+                          if (isSuccess || isDenied)
+                            ElevatedButton.icon(
+                              onPressed: () => ref.read(scannerProvider.notifier).resetScanState(),
+                              icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.black, size: 20),
+                              label: const Text(
+                                'Scan Next Ticket →',
+                                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 15),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                elevation: 6,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -338,28 +575,36 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ),
           ),
 
-          // Bottom Action & Metrics Bar
+          // Bottom Action & Metrics Dock
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: const BoxDecoration(
-              color: Color(0xFF111827),
+              color: ScannerColors.surface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(top: BorderSide(color: ScannerColors.border, width: 0.5)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Admitted Counter
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Admitted Today', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11)),
+                    const Text('Total Admitted', style: TextStyle(color: ScannerColors.textSecondary, fontSize: 11)),
                     Text(
                       '${scannerState.validCount}',
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                        color: ScannerColors.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ],
                 ),
+                // Quick Actions
                 Row(
                   children: [
+                    // Manual Lookup
                     OutlinedButton.icon(
                       onPressed: () {
                         showModalBottomSheet(
@@ -369,17 +614,21 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                           builder: (_) => const AttendeeLookupSheet(),
                         );
                       },
-                      icon: const Icon(Icons.search, color: Color(0xFFA78BFA), size: 18),
-                      label: const Text('Manual Lookup', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 12, fontWeight: FontWeight.bold)),
+                      icon: const Icon(Icons.search_rounded, color: ScannerColors.electricPurpleLight, size: 18),
+                      label: const Text(
+                        'Manual Lookup',
+                        style: TextStyle(color: ScannerColors.electricPurpleLight, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFA78BFA)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        side: const BorderSide(color: ScannerColors.electricPurpleLight),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Gate Pairing Settings
                     IconButton(
-                      icon: const Icon(Icons.tune_rounded, color: Colors.grey),
+                      icon: const Icon(Icons.tune_rounded, color: ScannerColors.textSecondary),
                       tooltip: 'Change Gate / Event',
                       onPressed: () {
                         Navigator.of(context).pushReplacement(
@@ -393,6 +642,47 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildZoomButton(String label, double zoom) {
+    final isSelected = _currentZoom == zoom;
+    return GestureDetector(
+      onTap: () async {
+        setState(() => _currentZoom = zoom);
+        await _cameraController.setZoomScale(zoom);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? ScannerColors.electricPurple : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCorner(int corner) {
+    // 0: top-left, 1: top-right, 2: bottom-left, 3: bottom-right
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        border: Border(
+          top: (corner == 0 || corner == 1) ? const BorderSide(color: ScannerColors.electricPurple, width: 4) : BorderSide.none,
+          bottom: (corner == 2 || corner == 3) ? const BorderSide(color: ScannerColors.electricPurple, width: 4) : BorderSide.none,
+          left: (corner == 0 || corner == 2) ? const BorderSide(color: ScannerColors.electricPurple, width: 4) : BorderSide.none,
+          right: (corner == 1 || corner == 3) ? const BorderSide(color: ScannerColors.electricPurple, width: 4) : BorderSide.none,
+        ),
       ),
     );
   }

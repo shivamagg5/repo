@@ -1,5 +1,6 @@
 import type { EventStatus } from './enums.js';
 import type { VenuePublic } from './venue.js';
+import type { TicketType } from './ticket.js';
 
 export interface Event {
   id: string;
@@ -56,6 +57,7 @@ export interface EventDetailPublicDto {
   venue: VenuePublic | null;
   media: EventMediaDto[];
   lineup: EventLineupDto[];
+  ticketTypes: TicketType[];
 }
 
 export interface EventCategoryPublicDto {

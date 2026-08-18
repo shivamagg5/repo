@@ -51,11 +51,20 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   bool _isDescriptionExpanded = false;
 
-  void _openTicketSelection(BuildContext context, String eventId, List<dynamic>? rawTiers) {
+  Future<void> _openTicketSelection(BuildContext context, String eventId, List<dynamic>? rawTiers) async {
     List<TicketTypeModel> ticketTypes = [];
     if (rawTiers != null && rawTiers.isNotEmpty) {
       ticketTypes = rawTiers.map((t) => TicketTypeModel.fromJson(t as Map<String, dynamic>)).toList();
     }
+
+    if (ticketTypes.isEmpty) {
+      try {
+        final api = ref.read(apiServiceProvider);
+        ticketTypes = await api.getEventTicketTypes(eventId);
+      } catch (_) {}
+    }
+
+    if (!context.mounted) return;
 
     showModalBottomSheet(
       context: context,

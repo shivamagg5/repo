@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/ticket_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/ticketing_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/lime_button.dart';
@@ -28,6 +29,8 @@ class TicketSelectionSheet extends ConsumerStatefulWidget {
 }
 
 class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
+  late List<TicketTypeModel> _tiers;
+  bool _isLoading = false;
   String? _selectedTypeId;
   int _quantity = 1;
   String? _localError;
@@ -35,15 +38,41 @@ class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
   @override
   void initState() {
     super.initState();
-    final firstAvailable = widget.ticketTypes.where((t) => !t.isSoldOut).firstOrNull;
-    if (firstAvailable != null) {
-      _selectedTypeId = firstAvailable.id;
-      _quantity = firstAvailable.minPerOrder;
+    _tiers = List.from(widget.ticketTypes);
+    if (_tiers.isNotEmpty) {
+      final firstAvailable = _tiers.where((t) => !t.isSoldOut).firstOrNull;
+      if (firstAvailable != null) {
+        _selectedTypeId = firstAvailable.id;
+        _quantity = firstAvailable.minPerOrder;
+      }
+    } else {
+      _loadTiers();
+    }
+  }
+
+  Future<void> _loadTiers() async {
+    setState(() => _isLoading = true);
+    try {
+      final api = ref.read(apiServiceProvider);
+      final fetched = await api.getEventTicketTypes(widget.eventId);
+      if (mounted) {
+        setState(() {
+          _tiers = fetched;
+          _isLoading = false;
+          final firstAvailable = _tiers.where((t) => !t.isSoldOut).firstOrNull;
+          if (firstAvailable != null) {
+            _selectedTypeId = firstAvailable.id;
+            _quantity = firstAvailable.minPerOrder;
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   TicketTypeModel? get _selectedTier =>
-      widget.ticketTypes.where((t) => t.id == _selectedTypeId).firstOrNull;
+      _tiers.where((t) => t.id == _selectedTypeId).firstOrNull;
 
   Future<void> _handleReserve() async {
     final tier = _selectedTier;
@@ -147,9 +176,19 @@ class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
           ],
 
           // Ticket Tiers List
-          if (widget.ticketTypes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.electricPurple,
+                  strokeWidth: 2.5,
+                ),
+              ),
+            )
+          else if (_tiers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
                   'No ticket tiers available for this event.',
@@ -158,7 +197,7 @@ class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
               ),
             )
           else
-            ...widget.ticketTypes.map((tier) {
+            ..._tiers.map((tier) {
               final isSelected = tier.id == _selectedTypeId;
               final isSoldOut = tier.isSoldOut;
 
