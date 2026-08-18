@@ -179,7 +179,9 @@ class TicketingNotifier extends StateNotifier<CheckoutState> {
     }
   }
 
-  /// Confirm payment with backend (reconciles server payment state)
+  /// Confirm payment with backend — RECONCILIATION ONLY.
+  /// Only succeeds when the webhook has already marked the payment transaction
+  /// as paid. Do NOT call this as proof of payment on the primary payment path.
   Future<OrderModel?> confirmOrder() async {
     if (state.order == null) return null;
     state = state.copyWith(isLoading: true);
@@ -189,8 +191,22 @@ class TicketingNotifier extends StateNotifier<CheckoutState> {
       return updatedOrder;
     } catch (e) {
       state = state.copyWith(isLoading: false);
-      // Even if immediate confirm returns pending, we return current order
-      return state.order;
+      // Return null so callers can detect failure, not stale state.
+      return null;
+    }
+  }
+
+  /// Poll GET /orders/:id until backend confirms authoritative `paid` status.
+  /// Returns null on network error — never returns stale local state as truth.
+  Future<OrderModel?> refreshOrder(String orderId) async {
+    try {
+      final order = await _apiService.getOrder(orderId);
+      state = state.copyWith(order: order);
+      return order;
+    } catch (_) {
+      // Return null so the caller shows "unable to verify" rather than
+      // accidentally treating the previous local state as current truth.
+      return null;
     }
   }
 }

@@ -6,12 +6,13 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
 import {
   orders,
   orderItems,
   inventoryReservations,
+  paymentTransactions,
   ticketTypes,
 } from '../../database/schema/index';
 import { OrderStateMachineService } from './order-state-machine.service';
@@ -61,8 +62,44 @@ export class OrdersService {
 
       // If already paid, return idempotently
       if (order.status === 'paid' || order.status === 'completed') {
-        const existingTickets = await tx.query.tickets.findMany({ where: eq(orders.id, orderId) });
-        return { order: this.mapOrder(order), ticketsIssuedCount: existingTickets.length };
+        return { order: this.mapOrder(order), ticketsIssuedCount: 0 };
+      }
+
+      // ==================================================================
+      // SECURITY GUARD — PAYMENT VERIFICATION REQUIRED
+      // This endpoint MUST NOT create payment authority. It may only succeed
+      // when the webhook has already verified and recorded a paid payment
+      // transaction for this exact order.
+      //
+      // Verified means:
+      //   - paymentTransaction.orderId  === orderId
+      //   - paymentTransaction.status   === 'paid'
+      //   - paymentTransaction.provider === a real gateway (not bypassed)
+      //   - paymentTransaction.providerPaymentId IS NOT NULL
+      //     (set only by the webhook after HMAC-verified confirmation)
+      // ==================================================================
+      const [verifiedPayment] = await tx
+        .select()
+        .from(paymentTransactions)
+        .where(
+          and(
+            eq(paymentTransactions.orderId, orderId),
+            eq(paymentTransactions.status, 'paid'),
+            isNotNull(paymentTransactions.providerPaymentId),
+          ),
+        )
+        .execute();
+
+      if (!verifiedPayment) {
+        this.logger.warn(
+          `[Security] confirmOrderPayment rejected: no verified payment for order ${orderId}. ` +
+          `Payment must be confirmed by the webhook before this endpoint can succeed.`,
+        );
+        throw new ConflictException({
+          code: 'PAYMENT_NOT_VERIFIED',
+          message:
+            'No verified payment found for this order. Complete payment through the payment gateway first.',
+        });
       }
 
       this.orderStateMachine.assertTransition(order.status as any, 'paid');

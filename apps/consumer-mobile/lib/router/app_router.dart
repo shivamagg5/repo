@@ -93,6 +93,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/confirmation/:id',
         builder: (context, state) => OrderConfirmationScreen(
           orderId: state.pathParameters['id'] ?? '',
+          isPending: state.uri.queryParameters['pending'] == 'true',
         ),
       ),
       GoRoute(

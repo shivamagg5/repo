@@ -28,10 +28,46 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     currency: string,
     metadata?: Record<string, unknown>,
   ): Promise<PaymentOrderIntent> {
-    // Generate deterministic provider order ID for test/integration execution
-    // In production, invokes Razorpay API: razorpay.orders.create({ amount, currency, receipt })
     const receipt = `order_${orderId.slice(0, 8)}`;
-    const providerOrderId = `order_${crypto.createHash('sha256').update(orderId + amountMinor).digest('hex').slice(0, 14)}`;
+    let providerOrderId = `order_${crypto.createHash('sha256').update(orderId + amountMinor).digest('hex').slice(0, 14)}`;
+
+    // Call live Razorpay API if valid API keys are configured
+    if (
+      this.keyId &&
+      this.keySecret &&
+      !this.keyId.includes('placeholder') &&
+      !this.keySecret.includes('placeholder')
+    ) {
+      try {
+        const authHeader = 'Basic ' + Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64');
+        const response = await fetch('https://api.razorpay.com/v1/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            amount: amountMinor,
+            currency,
+            receipt,
+            notes: metadata,
+          }),
+        });
+
+        if (response.ok) {
+          const rzpOrder: any = await response.json();
+          if (rzpOrder?.id) {
+            providerOrderId = rzpOrder.id;
+            this.logger.log(`[Razorpay] Created real order on Razorpay: ${providerOrderId} (receipt: ${receipt})`);
+          }
+        } else {
+          const errText = await response.text();
+          this.logger.warn(`[Razorpay] API returned ${response.status}: ${errText}. Using fallback providerOrderId.`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`[Razorpay] Network error calling Razorpay API: ${err.message}. Using fallback.`);
+      }
+    }
 
     return {
       providerOrderId,
@@ -42,7 +78,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
         amount: amountMinor,
         currency,
         order_id: providerOrderId,
-        name: 'Event Ecosystem Platform',
+        name: 'EventPulse',
         description: `Ticket Purchase (Order #${orderId.slice(0, 8)})`,
         receipt,
         notes: metadata,

@@ -52,6 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _fetchEvents() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -79,17 +80,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final list = data is Map<String, dynamic> && data.containsKey('items')
             ? data['items'] as List<dynamic>
             : (data is List ? data : []);
+        if (!mounted) return;
         setState(() {
           _results = list.cast<Map<String, dynamic>>();
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _error = 'Failed to load events';
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Could not connect to server';
         _isLoading = false;
