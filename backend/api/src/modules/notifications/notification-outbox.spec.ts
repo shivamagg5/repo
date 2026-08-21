@@ -130,6 +130,13 @@ describe('NotificationOutboxService — Atomic Outbox & Worker Claim Suite', () 
       { id: 'dt-1', token: 'invalid_token_xyz', platform: 'ios', active: true },
     ]);
 
+    jest.spyOn(pushProvider, 'send').mockResolvedValueOnce({
+      status: 'permanent_failure',
+      providerMessageId: null,
+      failureReason: 'FCM Token Invalid: NotRegistered',
+      invalidToken: true,
+    });
+
     await outboxService.processOutboxBatch('worker-1');
     expect(mockDb.update).toHaveBeenCalled();
   });
