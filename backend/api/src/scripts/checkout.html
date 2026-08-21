@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Razorpay Test Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 40px; text-align: center; background: #0f172a; color: white;">
+  <h2>Razorpay Sandbox Live Payment Verification</h2>
+  <p>Order ID: <b id="orderIdDisplay">order_TSNkl9yVGwCBjO</b></p>
+  <button id="payButton" style="padding: 14px 28px; font-size: 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+    Open Razorpay Checkout
+  </button>
+  <div id="result" style="margin-top: 30px; font-size: 18px; color: #4ade80;"></div>
+
+  <script>
+    const orderId = 'order_TSNkl9yVGwCBjO';
+    const keyId = 'rzp_test_TRAzvU0SEyAz0K';
+
+    const options = {
+      key: keyId,
+      amount: 150000,
+      currency: "INR",
+      name: "EventPulse Live Staging",
+      description: "Gate E Real Consumer Payment Test",
+      order_id: orderId,
+      prefill: {
+        name: "Test Customer",
+        email: "customer1@staging.eventplatform.com",
+        contact: "9999999999"
+      },
+      theme: {
+        color: "#3b82f6"
+      },
+      handler: function (response) {
+        document.getElementById('result').innerText = "SUCCESS: " + JSON.stringify(response);
+        console.log("PAYMENT_SUCCESS_RESPONSE:", response);
+      },
+      modal: {
+        ondismiss: function () {
+          console.log("Checkout modal dismissed");
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+
+    document.getElementById('payButton').onclick = function() {
+      rzp.open();
+    };
+
+    // Auto-open
+    window.onload = function() {
+      rzp.open();
+    };
+  </script>
+</body>
+</html>
