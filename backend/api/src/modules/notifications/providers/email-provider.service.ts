@@ -53,9 +53,18 @@ export class EmailProviderService implements INotificationProvider {
           };
         }
 
+        if (!data.id) {
+          this.logger.error(`[EmailProvider] Resend API response missing 'id': ${JSON.stringify(data)}`);
+          return {
+            status: 'permanent_failure',
+            providerMessageId: null,
+            failureReason: 'Resend API error: Response did not contain a valid email ID',
+          };
+        }
+
         return {
           status: 'provider_accepted',
-          providerMessageId: data.id || `res_${Date.now()}`,
+          providerMessageId: data.id,
           failureReason: null,
         };
       } catch (err: any) {
@@ -87,10 +96,13 @@ export class EmailProviderService implements INotificationProvider {
         });
 
         if (res.status === 200 || res.status === 202) {
-          const messageId = res.headers.get('X-Message-Id') || `sg_${Date.now()}`;
+          const messageId = res.headers.get('X-Message-Id') || res.headers.get('x-message-id');
+          if (!messageId) {
+            this.logger.warn(`[EmailProvider] SendGrid accepted message but X-Message-Id header was not present`);
+          }
           return {
             status: 'provider_accepted',
-            providerMessageId: messageId,
+            providerMessageId: messageId || null,
             failureReason: null,
           };
         }

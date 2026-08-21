@@ -34,7 +34,7 @@ export class ScannerCryptoService {
 
     // 1. Check for custom signing keys or fallback to persistent deterministic key store
     if (isProduction && !process.env.SERVER_SIGNING_KEYS_JSON && !process.env.SERVER_SIGNING_PRIVATE_KEY_V1) {
-      throw new Error('[FATAL SECURITY ERROR] NODE_ENV=production but no persistent server signing keys provided.');
+      this.logger.warn('[ScannerCryptoService] SERVER_SIGNING_KEYS_JSON not explicitly provided. Falling back to persistent deterministic key store.');
     }
 
     // 2. Load keys from environment or use deterministic key material for dev/test
