@@ -26,6 +26,7 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
     { id: 'orders', label: 'Orders', href: '/orders', icon: <span>🎟️</span> },
     { id: 'promoters', label: 'Promoters', href: '/promoters', icon: <span>🚀</span> },
     { id: 'team', label: 'Team', href: '/team', icon: <span>👥</span> },
+    { id: 'settlements', label: 'Settlements', href: '/settlements', icon: <span>💰</span> },
   ];
 
   const defaultActions = actions || (

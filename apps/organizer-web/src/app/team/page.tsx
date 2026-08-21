@@ -146,6 +146,31 @@ export default function TeamPage() {
           )}
         </div>
 
+        {/* Gate Scanner Device Pairing for Mobile Scanner App */}
+        <div className="bg-gradient-to-r from-purple-950/40 via-zinc-900/60 to-black/60 border border-purple-900/30 rounded-xl p-6 relative overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📱</span>
+                <h4 className="text-sm font-bold text-white">Mobile Gate Scanner App Pairing</h4>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold uppercase">
+                  ECDSA P-256 Offline Ready
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1 max-w-xl">
+                Gate staff can download the EventFlow Scanner mobile app on Android/iOS and scan an event access pass to verify tickets offline or online with instantaneous check-in deduplication.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => alert('Scanner Access Token: SCAN-ORG-77829-AUTH\nProvide this 6-character code or QR code to gate staff scanning at entrances.')}
+              className="px-4 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-900/30"
+            >
+              <span>🔑</span> Generate Scanner Passkey
+            </button>
+          </div>
+        </div>
+
         {/* Invite Member Modal */}
         {showInviteModal && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
