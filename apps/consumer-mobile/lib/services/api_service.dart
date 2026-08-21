@@ -82,7 +82,7 @@ class ApiService {
       {
         'ticketTypeId': ticketTypeId,
         'quantity': quantity,
-        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+        'idempotencyKey': ?idempotencyKey,
       },
       ReservationModel.fromJson,
       customHeaders: headers,
@@ -136,6 +136,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> createPaymentIntent({
     required String orderId,
+    String? provider,
     String? idempotencyKey,
   }) async {
     final headers = idempotencyKey != null ? {'Idempotency-Key': idempotencyKey} : null;
@@ -143,7 +144,8 @@ class ApiService {
       '/payments/intent',
       {
         'orderId': orderId,
-        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+        'provider': ?provider,
+        'idempotencyKey': ?idempotencyKey,
       },
       (data) => data,
       customHeaders: headers,

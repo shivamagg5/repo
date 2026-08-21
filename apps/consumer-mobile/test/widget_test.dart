@@ -45,7 +45,4 @@ class _FakeAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier
 
   @override
   Future<void> signOut() async {}
-
-  @override
-  Future<void> refreshProfile() async {}
 }

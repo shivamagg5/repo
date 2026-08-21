@@ -108,7 +108,7 @@ class _AnimatedShimmerBoxState extends State<_AnimatedShimmerBox>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) {
+      builder: (_, _) {
         return Container(
           width: widget.width,
           height: widget.height,
@@ -298,8 +298,8 @@ class ShimmerLargeRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (_, __) => const ShimmerCardLarge(),
+        separatorBuilder: (_, _) => const SizedBox(width: 16),
+        itemBuilder: (_, _) => const ShimmerCardLarge(),
       ),
     );
   }
@@ -316,8 +316,8 @@ class ShimmerSmallRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: 4,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, __) => const ShimmerCardSmall(),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, _) => const ShimmerCardSmall(),
       ),
     );
   }

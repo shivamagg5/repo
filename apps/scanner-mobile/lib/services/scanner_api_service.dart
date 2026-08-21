@@ -58,7 +58,7 @@ class ScannerApiService {
       body: jsonEncode({
         'deviceIdentifier': deviceIdentifier,
         'publicKeyPem': publicKeyPem,
-        if (deviceModel != null) 'deviceModel': deviceModel,
+        'deviceModel': ?deviceModel,
       }),
     );
     return ApiEnvelope.unwrapMap(res);

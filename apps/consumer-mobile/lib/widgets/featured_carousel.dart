@@ -196,7 +196,7 @@ class _CarouselPage extends StatelessWidget {
             CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(
+              placeholder: (_, _) => Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -205,7 +205,7 @@ class _CarouselPage extends StatelessWidget {
                   ),
                 ),
               ),
-              errorWidget: (_, __, ___) => _PlaceholderBg(category: category),
+              errorWidget: (_, _, _) => _PlaceholderBg(category: category),
             )
           else
             _PlaceholderBg(category: category),

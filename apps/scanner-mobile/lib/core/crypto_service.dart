@@ -82,10 +82,10 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7Z5f80V274L+JgE66M50E4e4G76M
     // Parse SubjectPublicKeyInfo DER: SEQUENCE { SEQUENCE { OID, OID }, BIT STRING }
     final asn1 = ASN1Parser(Uint8List.fromList(derBytes));
     final topLevel = asn1.nextObject() as ASN1Sequence;
-    final bitString = topLevel.elements![1] as ASN1BitString;
+    final bitString = topLevel.elements[1] as ASN1BitString;
 
     // The bit string content is the uncompressed EC point: 0x04 || X || Y
-    final pointBytes = bitString.stringValue!;
+    final pointBytes = bitString.stringValue;
 
     final domainParams = ECDomainParameters('prime256v1');
     final point = domainParams.curve.decodePoint(pointBytes)!;
@@ -108,8 +108,8 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7Z5f80V274L+JgE66M50E4e4G76M
 
     final asn1 = ASN1Parser(Uint8List.fromList(derBytes));
     final seq = asn1.nextObject() as ASN1Sequence;
-    final r = (seq.elements![0] as ASN1Integer).valueAsBigInteger!;
-    final s = (seq.elements![1] as ASN1Integer).valueAsBigInteger!;
+    final r = (seq.elements[0] as ASN1Integer).valueAsBigInteger;
+    final s = (seq.elements[1] as ASN1Integer).valueAsBigInteger;
     return ECSignature(r, s);
   }
 

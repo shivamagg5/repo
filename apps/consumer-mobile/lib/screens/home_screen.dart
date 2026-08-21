@@ -166,7 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                         ),
                   loading: () => const ShimmerCarousel(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ),
 
@@ -190,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           setState(() => _selectedCategory = cat),
                     ),
                     loading: () => const SizedBox(height: 44),
-                    error: (_, __) => const SizedBox(height: 44),
+                    error: (_, _) => const SizedBox(height: 44),
                   ),
                 ),
               ),
@@ -216,7 +216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: events.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(width: 12),
                             itemBuilder: (_, index) {
                               final e = events[index];
@@ -234,8 +234,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   price: _formatPrice(e),
                                   onTap: () {
                                     final slug = e['slug'] ?? e['id'];
-                                    if (slug != null)
-                                  context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
+                                    if (slug != null) {
+                                      context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
+                                    }
                                   },
                                 ),
                               );
@@ -247,7 +248,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ),
 
@@ -280,7 +281,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         itemCount: events.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (_, _) =>
                             const SizedBox(width: 16),
                         itemBuilder: (context, index) {
                           final e = events[index];
@@ -304,8 +305,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 interestedCount: 120 + index * 37,
                                 onTap: () {
                                   final slug = e['slug'] ?? e['id'];
-                                  if (slug != null)
+                                  if (slug != null) {
                                     context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
+                                  }
                                 },
                               ),
                             ),
@@ -347,7 +349,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         itemCount: events.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (_, _) =>
                             const SizedBox(width: 12),
                         itemBuilder: (context, index) {
                           final e = events[index];
@@ -366,8 +368,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               interestedCount: 80 + index * 29,
                               onTap: () {
                                 final slug = e['slug'] ?? e['id'];
-                                if (slug != null)
+                                if (slug != null) {
                                   context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
+                                }
                               },
                             ),
                           );
@@ -376,7 +379,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                   loading: () => const ShimmerSmallRow(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
               ),
 
