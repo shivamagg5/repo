@@ -11,7 +11,17 @@ export class EmailProviderService implements INotificationProvider {
   async send(input: ProviderSendInput): Promise<ProviderSendResult> {
     const resendApiKey = process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY;
     const sendgridApiKey = process.env.SENDGRID_API_KEY;
-    const fromAddress = process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const fromAddress = process.env.EMAIL_FROM_ADDRESS || (isProduction ? null : 'onboarding@resend.dev');
+
+    if (!fromAddress) {
+      this.logger.error('[EmailProvider] Production sender email missing (EMAIL_FROM_ADDRESS must be set to a verified domain)');
+      return {
+        status: 'permanent_failure',
+        providerMessageId: null,
+        failureReason: 'EMAIL_PROVIDER_UNCONFIGURED: Missing verified EMAIL_FROM_ADDRESS for production sending domain',
+      };
+    }
 
     // 1. Resend API Integration
     if (resendApiKey) {
