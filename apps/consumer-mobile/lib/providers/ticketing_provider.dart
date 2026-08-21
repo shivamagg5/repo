@@ -63,7 +63,14 @@ class TicketingNotifier extends StateNotifier<CheckoutState> {
     super.dispose();
   }
 
-  /// Reserve tickets atomically via backend
+  /// Resets error and loading state — call when re-opening the ticket sheet
+  /// to prevent stale error messages from a previous attempt bleeding through.
+  void clearError() {
+    state = state.copyWith(clearError: true, isLoading: false);
+  }
+
+  /// Reserve tickets atomically via backend.
+  /// On any failure, sets errorMessage and returns null — no fabricated business objects.
   Future<ReservationModel?> reserveTickets({
     required String ticketTypeId,
     required int quantity,
@@ -80,7 +87,11 @@ class TicketingNotifier extends StateNotifier<CheckoutState> {
       // Fetch the created order details
       OrderModel? order;
       if (reservation.orderId.isNotEmpty) {
-        order = await _apiService.getOrder(reservation.orderId);
+        try {
+          order = await _apiService.getOrder(reservation.orderId);
+        } catch (_) {
+          // Order fetch failed — reservation still valid; checkout will retry.
+        }
       }
 
       state = state.copyWith(
@@ -93,10 +104,11 @@ class TicketingNotifier extends StateNotifier<CheckoutState> {
       _startTimer(reservation.expiresAt);
       return reservation;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e is ApiException ? e.message : 'Reservation failed. Please try again.',
-      );
+      // Real failure — surface to user. Never invent a reservation.
+      final message = e is ApiException
+          ? e.message
+          : 'Reservation failed. Please check your connection and try again.';
+      state = state.copyWith(isLoading: false, errorMessage: message);
       return null;
     }
   }

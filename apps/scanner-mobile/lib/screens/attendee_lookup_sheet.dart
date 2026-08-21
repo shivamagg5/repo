@@ -56,36 +56,9 @@ class _AttendeeLookupSheetState extends ConsumerState<AttendeeLookupSheet> {
         _searching = false;
       });
     } catch (err) {
-      // Fallback demo mock if offline / demo mode
       setState(() {
-        _results = [
-          {
-            'ticketId': 'tkt-001',
-            'purchaserName': 'Rahul Sharma',
-            'ticketNumber': 'TKT-2026-VIP-001',
-            'tierName': 'VIP Elevated Deck Pass',
-            'status': 'issued',
-          },
-          {
-            'ticketId': 'tkt-002',
-            'purchaserName': 'Priya Patel',
-            'ticketNumber': 'TKT-2026-GA-002',
-            'tierName': 'General Admission — Early Bird',
-            'status': 'checked_in',
-          },
-          {
-            'ticketId': 'tkt-003',
-            'purchaserName': 'Aman Gupta',
-            'ticketNumber': 'TKT-2026-VIP-003',
-            'tierName': 'VIP Elevated Deck Pass',
-            'status': 'issued',
-          },
-        ].where((item) {
-          final name = (item['purchaserName'] ?? '').toLowerCase();
-          final tkt = (item['ticketNumber'] ?? '').toLowerCase();
-          final q = query.toLowerCase();
-          return name.contains(q) || tkt.contains(q);
-        }).toList();
+        _error = 'Failed to search attendees: ${err.toString()}';
+        _results = [];
         _searching = false;
       });
     }

@@ -79,26 +79,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
       } else {
         if (mounted) setState(() => _loadingEvents = false);
       }
-    } catch (_) {
+    } catch (err) {
       if (mounted) {
         setState(() {
           _loadingEvents = false;
-          // Fallback events if offline during pairing
-          _liveEvents = [
-            {
-              'id': 'b0000000-0000-0000-0000-000000000001',
-              'title': 'Cyberpunk Rave 2026',
-              'city': 'Mumbai',
-              'venueName': 'Jio World Garden',
-            },
-            {
-              'id': 'evt-neon-nights-2026',
-              'title': 'Neon Nights Festival 2026',
-              'city': 'Bengaluru',
-              'venueName': 'Whitefield Arena',
-            },
-          ];
-          _selectEvent(_liveEvents.first);
+          _liveEvents = [];
+          _error = 'Failed to load events: ${err.toString()}';
         });
       }
     }

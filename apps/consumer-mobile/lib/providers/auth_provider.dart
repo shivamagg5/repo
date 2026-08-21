@@ -168,6 +168,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> signInWithDemoAccount() async {
+    state = state.copyWith(status: AuthStatus.loading, clearError: true);
+    const testEmail = 'consumer.demo@eventplatform.com';
+    const testPassword = 'Password123!';
+
+    var result = await _authService.signInWithEmail(testEmail, testPassword);
+    if (!result.isSuccess) {
+      result = await _authService.signUpWithEmail(testEmail, testPassword, name: 'Demo Consumer');
+      if (!result.isSuccess) {
+        result = await _authService.signInWithEmail(testEmail, testPassword);
+      }
+    }
+
+    if (result.isSuccess && result.user != null) {
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: result.user,
+      );
+      await _syncAndHydrate(result.user!);
+      return true;
+    } else {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: result.error ?? 'Demo sign in failed. Please check connection or sign in manually.',
+      );
+      return false;
+    }
+  }
+
   Future<void> signInWithGoogle() async {
     await _authService.signInWithGoogle();
   }

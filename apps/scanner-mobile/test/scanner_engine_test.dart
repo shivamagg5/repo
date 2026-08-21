@@ -90,7 +90,7 @@ void main() {
       expect(isValid, isFalse);
     });
 
-    test('Validates Event Authorization Package structure against Root Trust Anchor', () {
+    test('Rejects invalid package signature against Root Trust Anchor', () {
       final packageData = {
         'deviceId': 'dev_test_01',
         'eventId': 'evt_summer_fest_2026',
@@ -102,10 +102,10 @@ void main() {
 
       final isValid = cryptoService.verifyAuthorizationPackage(
         packageData: packageData,
-        packageSignature: 'mock-verified-signature-from-server',
+        packageSignature: 'mock-unverified-signature-from-server',
       );
 
-      expect(isValid, isTrue);
+      expect(isValid, isFalse, reason: 'Invalid signature must be cryptographically rejected');
     });
   });
 

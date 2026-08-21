@@ -849,6 +849,12 @@ export class EventsService {
       .where(eq(eventLineups.eventId, e.id))
       .execute();
 
+    const eventTicketTypes = await this.db.db
+      .select()
+      .from(ticketTypes)
+      .where(eq(ticketTypes.eventId, e.id))
+      .execute();
+
     return {
       id: e.id,
       title: e.title,
@@ -863,6 +869,24 @@ export class EventsService {
       venue: venuePublic,
       media: media.map((m) => ({ id: m.id, url: m.url, type: m.type, sortOrder: m.sortOrder })),
       lineup: lineup.map((l) => ({ id: l.id, name: l.name, role: l.role, sortOrder: l.sortOrder })),
+      ticketTypes: eventTicketTypes.map((t) => ({
+        id: t.id,
+        eventId: t.eventId,
+        name: t.name,
+        description: t.description,
+        priceMinor: Number(t.priceMinor),
+        currency: t.currency,
+        quantity: t.quantity,
+        soldQuantity: t.soldQuantity,
+        reservedQuantity: t.reservedQuantity,
+        minPerOrder: t.minPerOrder,
+        maxPerOrder: t.maxPerOrder,
+        saleStartsAt: t.saleStartsAt ? t.saleStartsAt.toISOString() : null,
+        saleEndsAt: t.saleEndsAt ? t.saleEndsAt.toISOString() : null,
+        status: t.status,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+      })),
     };
   }
 }

@@ -72,9 +72,9 @@ export const Footer: React.FC<FooterProps> = ({
         <div>
           <h4 style={{ color: '#FFFFFF', fontWeight: '700', margin: '0 0 12px 0', fontSize: '14px' }}>Partners & B2B</h4>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <li><a href="http://localhost:3002" style={{ color: 'inherit', textDecoration: 'none' }}>Organizer Console</a></li>
-            <li><a href="http://localhost:3003" style={{ color: 'inherit', textDecoration: 'none' }}>Venue Portal</a></li>
-            <li><a href="http://localhost:3004" style={{ color: 'inherit', textDecoration: 'none' }}>Promoter Affiliate</a></li>
+            <li><button type="button" onClick={() => onNavigate?.('/organizer')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>Organizer Console</button></li>
+            <li><button type="button" onClick={() => onNavigate?.('/venue')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>Venue Portal</button></li>
+            <li><button type="button" onClick={() => onNavigate?.('/promoter')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>Promoter Affiliate</button></li>
           </ul>
         </div>
 

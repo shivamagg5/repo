@@ -38,4 +38,14 @@ export interface IPaymentGateway {
    * Parse provider-specific webhook payload into normalized internal PaymentWebhookEvent.
    */
   parseWebhookEvent(rawBodyBuffer: Buffer): PaymentWebhookEvent;
+
+  /**
+   * Execute real refund against payment provider API before local state transition.
+   */
+  createRefund(
+    providerPaymentId: string,
+    amountMinor: number,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<{ providerRefundId: string; status: string; rawPayload?: any }>;
 }

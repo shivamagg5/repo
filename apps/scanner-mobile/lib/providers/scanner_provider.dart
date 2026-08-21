@@ -274,22 +274,28 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
           authToken: token,
         );
 
-        final newDeviceId = regRes['id'] ?? regRes['deviceId'] ?? 'dev-scanner-${DateTime.now().millisecondsSinceEpoch}';
-        await _deviceKeyService.saveRegisteredDeviceId(newDeviceId);
-
+        final newDeviceId = (regRes['id'] ?? regRes['deviceId'])?.toString();
+        if (newDeviceId != null && newDeviceId.isNotEmpty) {
+          await _deviceKeyService.saveRegisteredDeviceId(newDeviceId);
+          state = state.copyWith(
+            isInitialized: true,
+            isRegistered: true,
+            deviceId: newDeviceId,
+            pendingCount: pending,
+          );
+        } else {
+          state = state.copyWith(
+            isInitialized: true,
+            isRegistered: false,
+            errorMessage: 'Registration failed: Invalid device ID from server',
+            pendingCount: pending,
+          );
+        }
+      } catch (err) {
         state = state.copyWith(
           isInitialized: true,
-          isRegistered: true,
-          deviceId: newDeviceId,
-          pendingCount: pending,
-        );
-      } catch (_) {
-        const fallbackId = 'dev-scanner-gate-01';
-        await _deviceKeyService.saveRegisteredDeviceId(fallbackId);
-        state = state.copyWith(
-          isInitialized: true,
-          isRegistered: true,
-          deviceId: fallbackId,
+          isRegistered: false,
+          errorMessage: 'Device registration failed: ${err.toString()}',
           pendingCount: pending,
         );
       }
@@ -321,40 +327,49 @@ class ScannerNotifier extends StateNotifier<ScannerState> {
       );
 
       final remotePkg = res['package'] is Map ? res['package'] as Map<String, dynamic> : res;
-      final pkgSig = (res['packageSignature'] ?? remotePkg['packageSignature'] ?? 'verified-sig') as String;
+      final pkgSig = (res['packageSignature'] ?? remotePkg['packageSignature']) as String?;
+
+      if (pkgSig == null || pkgSig.isEmpty) {
+        state = state.copyWith(errorMessage: 'Pairing failed: missing package signature from server.');
+        return false;
+      }
 
       final isValid = _cryptoService.verifyAuthorizationPackage(
         packageData: remotePkg,
         packageSignature: pkgSig,
       );
 
-      if (isValid) {
-        pkg = remotePkg;
-        serverTicketKey = pkg['publicKeyPem'] as String? ?? CryptoService.rootTrustPublicKeyPem;
+      if (!isValid) {
+        state = state.copyWith(errorMessage: 'Pairing rejected: Cryptographic verification of Event Authorization Package failed.');
+        return false;
       }
-    } catch (_) {}
 
-    pkg ??= {
-      'eventId': eventId,
-      'gateId': gateId,
-      'validFrom': DateTime.now().subtract(const Duration(hours: 24)).toIso8601String(),
-      'validUntil': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
-      'publicKeyPem': CryptoService.rootTrustPublicKeyPem,
-    };
-    serverTicketKey ??= CryptoService.rootTrustPublicKeyPem;
+      pkg = remotePkg;
+      serverTicketKey = pkg['publicKeyPem'] as String? ?? pkg['publicVerificationKeyPem'] as String?;
+      if (serverTicketKey == null || serverTicketKey.isEmpty) {
+        state = state.copyWith(errorMessage: 'Pairing failed: Authorization package contains no public verification key.');
+        return false;
+      }
 
-    state = state.copyWith(
-      isPaired: true,
-      eventId: eventId,
-      gateId: gateId,
-      eventTitle: eventTitle,
-      gateName: gateName,
-      authPackage: pkg,
-      serverTicketPublicKeyPem: serverTicketKey,
-      errorMessage: null,
-    );
-    _analyticsService?.track('scanner_event_selected', eventId: eventId);
-    return true;
+      state = state.copyWith(
+        isPaired: true,
+        eventId: eventId,
+        gateId: gateId,
+        eventTitle: eventTitle,
+        gateName: gateName,
+        authPackage: pkg,
+        serverTicketPublicKeyPem: serverTicketKey,
+        errorMessage: null,
+      );
+      _analyticsService?.track('scanner_event_selected', eventId: eventId);
+      return true;
+    } catch (err) {
+      state = state.copyWith(
+        isPaired: false,
+        errorMessage: 'Pairing failed: ${err.toString()}',
+      );
+      return false;
+    }
   }
 
   void toggleOnline(bool isOnline) {

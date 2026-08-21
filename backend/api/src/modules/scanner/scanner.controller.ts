@@ -9,9 +9,11 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ScannerService } from './scanner.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
+import { DeviceAuthGuard } from '../../common/guards/device-auth.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   deviceRegisterSchema,
@@ -22,8 +24,36 @@ import {
 } from '@platform/validation';
 import type { Request } from 'express';
 
+/**
+ * FIX-005: Extracts identity claims from the authenticated JWT.
+ * Throws ForbiddenException if the required claim is absent.
+ * Zero-UUID fallbacks are explicitly prohibited — a missing claim
+ * is a fatal auth error, not a default value.
+ */
+function requireUserId(req: Request): string {
+  const userId = (req as any).user?.sub ?? (req as any).user?.id;
+  if (!userId) {
+    throw new ForbiddenException({
+      code: 'MISSING_USER_IDENTITY',
+      message: 'Authenticated user identity claim is absent. Request cannot be processed.',
+    });
+  }
+  return userId;
+}
+
+function requireOrganizationId(req: Request): string {
+  const orgId = (req as any).user?.organizationId;
+  if (!orgId) {
+    throw new ForbiddenException({
+      code: 'MISSING_ORGANIZATION_CONTEXT',
+      message: 'Authenticated user does not have an organization context. Scanner access requires org membership.',
+    });
+  }
+  return orgId;
+}
+
 @Controller('scanner')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, DeviceAuthGuard)
 export class ScannerController {
   constructor(private readonly scannerService: ScannerService) {}
 
@@ -33,7 +63,8 @@ export class ScannerController {
     @Body(new ZodValidationPipe(deviceRegisterSchema)) body: any,
     @Req() req: Request,
   ) {
-    const orgId = (req as any).user?.organizationId ?? '00000000-0000-0000-0000-000000000000';
+    // FIX-005: orgId must come from verified JWT — no zero-UUID fallback
+    const orgId = requireOrganizationId(req);
     return this.scannerService.registerDevice(body, orgId);
   }
 
@@ -43,8 +74,10 @@ export class ScannerController {
     @Body(new ZodValidationPipe(devicePairSchema)) body: any,
     @Req() req: Request,
   ) {
-    const staffUserId = (req as any).user?.sub ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000000';
-    return this.scannerService.pairDevice(body, staffUserId);
+    // FIX-005/006: Both userId and orgId required; service enforces org/device binding
+    const staffUserId = requireUserId(req);
+    const staffOrgId = requireOrganizationId(req);
+    return this.scannerService.pairDevice(body, staffUserId, staffOrgId);
   }
 
   @Get('events/:id/package')
@@ -54,8 +87,9 @@ export class ScannerController {
     @Query('gateId') gateId: string,
     @Req() req: Request,
   ) {
-    const staffUserId = (req as any).user?.sub ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000000';
-    return this.scannerService.pairDevice({ deviceId, eventId, gateId }, staffUserId);
+    const staffUserId = requireUserId(req);
+    const staffOrgId = requireOrganizationId(req);
+    return this.scannerService.pairDevice({ deviceId, eventId, gateId }, staffUserId, staffOrgId);
   }
 
   @Post('scan')
@@ -64,7 +98,7 @@ export class ScannerController {
     @Body(new ZodValidationPipe(scanTicketSchema)) body: any,
     @Req() req: Request,
   ) {
-    const staffUserId = (req as any).user?.sub ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000000';
+    const staffUserId = requireUserId(req);
     return this.scannerService.scanTicket(body, staffUserId);
   }
 
@@ -74,7 +108,7 @@ export class ScannerController {
     @Body(new ZodValidationPipe(batchSyncScansSchema)) body: any,
     @Req() req: Request,
   ) {
-    const staffUserId = (req as any).user?.sub ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000000';
+    const staffUserId = requireUserId(req);
     return this.scannerService.syncOfflineScans(body, staffUserId);
   }
 
@@ -93,7 +127,7 @@ export class ScannerController {
     @Body() body: { ticketId: string; eventId: string; gateId: string; deviceId: string },
     @Req() req: Request,
   ) {
-    const staffUserId = (req as any).user?.sub ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000000';
+    const staffUserId = requireUserId(req);
     return this.scannerService.performCheckinTransaction(
       body.ticketId,
       body.eventId,

@@ -91,14 +91,63 @@ describe('ScannerService — Hardened Device Operations & Tamper Testing Suite',
     expect(res.status).toBe('active');
   });
 
+  it('DEVICE REGISTRATION: Updates public key for existing active device', async () => {
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({
+      id: 'dev-123',
+      deviceIdentifier: 'HARDWARE-UUID-01',
+      status: 'active',
+      lastSeenAt: new Date(),
+    });
+
+    const res = await scannerService.registerDevice(
+      { deviceIdentifier: 'HARDWARE-UUID-01', publicKeyPem: '-----BEGIN PUBLIC KEY-----\nNEW_KEY...' },
+      'org-123',
+    );
+
+    expect(res.deviceId).toBe('dev-123');
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+
+  it('DEVICE REGISTRATION: Rejects re-registration attempt of revoked device', async () => {
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({
+      id: 'dev-revoked',
+      deviceIdentifier: 'HARDWARE-UUID-REVOKED',
+      status: 'revoked',
+    });
+
+    await expect(
+      scannerService.registerDevice(
+        { deviceIdentifier: 'HARDWARE-UUID-REVOKED', publicKeyPem: '-----BEGIN PUBLIC KEY-----\n...' },
+        'org-123',
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('CROSS-ORG REJECTION: Rejects pairing when device org != staff org', async () => {
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({
+      id: 'dev-org-2',
+      status: 'active',
+      organizationId: 'org-2',
+    });
+
+    await expect(
+      scannerService.pairDevice(
+        { deviceId: 'dev-org-2', eventId: 'evt-1', gateId: 'gate-1' },
+        'user-staff-1',
+        'org-1',
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   it('DEVICE AUTHENTICATION: Pairs device and returns signed Event Authorization Package', async () => {
-    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-123', status: 'active' });
-    mockDb.query.events.findFirst.mockResolvedValue({ id: 'evt-1', startsAt: new Date(), endsAt: new Date() });
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-123', status: 'active', organizationId: 'org-1' });
+    mockDb.query.events.findFirst.mockResolvedValue({ id: 'evt-1', startsAt: new Date(), endsAt: new Date(), organizerOrganizationId: 'org-1' });
     mockDb.query.checkinGates.findFirst.mockResolvedValue({ id: 'gate-1', eventId: 'evt-1' });
 
     const pkg = await scannerService.pairDevice(
       { deviceId: 'dev-123', eventId: 'evt-1', gateId: 'gate-1' },
       'user-staff-1',
+      'org-1',
     );
 
     expect(pkg.deviceId).toBe('dev-123');
@@ -113,10 +162,10 @@ describe('ScannerService — Hardened Device Operations & Tamper Testing Suite',
   });
 
   it('DEVICE REVOCATION: Rejects revoked device during pairing attempt', async () => {
-    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-revoked', status: 'revoked' });
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-revoked', status: 'revoked', organizationId: 'org-1' });
 
     await expect(
-      scannerService.pairDevice({ deviceId: 'dev-revoked', eventId: 'evt-1', gateId: 'gate-1' }, 'staff-1'),
+      scannerService.pairDevice({ deviceId: 'dev-revoked', eventId: 'evt-1', gateId: 'gate-1' }, 'staff-1', 'org-1'),
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -124,18 +173,19 @@ describe('ScannerService — Hardened Device Operations & Tamper Testing Suite',
     mockDb.query.checkinDevices.findFirst.mockResolvedValue(null);
 
     await expect(
-      scannerService.pairDevice({ deviceId: 'dev-unknown', eventId: 'evt-1', gateId: 'gate-1' }, 'staff-1'),
+      scannerService.pairDevice({ deviceId: 'dev-unknown', eventId: 'evt-1', gateId: 'gate-1' }, 'staff-1', 'org-1'),
     ).rejects.toThrow(ForbiddenException);
   });
 
   it('AUTHORIZATION PACKAGE TAMPERING: Rejects package with tampered eventId or gateId', async () => {
-    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-123', status: 'active' });
-    mockDb.query.events.findFirst.mockResolvedValue({ id: 'evt-1', startsAt: new Date(), endsAt: new Date() });
+    mockDb.query.checkinDevices.findFirst.mockResolvedValue({ id: 'dev-123', status: 'active', organizationId: 'org-1' });
+    mockDb.query.events.findFirst.mockResolvedValue({ id: 'evt-1', startsAt: new Date(), endsAt: new Date(), organizerOrganizationId: 'org-1' });
     mockDb.query.checkinGates.findFirst.mockResolvedValue({ id: 'gate-1', eventId: 'evt-1' });
 
     const pkg = await scannerService.pairDevice(
       { deviceId: 'dev-123', eventId: 'evt-1', gateId: 'gate-1' },
       'user-staff-1',
+      'org-1',
     );
 
     // Tamper event ID in package

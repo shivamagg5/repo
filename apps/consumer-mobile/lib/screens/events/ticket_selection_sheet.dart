@@ -48,6 +48,10 @@ class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
     } else {
       _loadTiers();
     }
+    // Clear any stale error/loading state from a previous reservation attempt
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(ticketingProvider.notifier).clearError();
+    });
   }
 
   Future<void> _loadTiers() async {
@@ -83,11 +87,23 @@ class _TicketSelectionSheetState extends ConsumerState<TicketSelectionSheet> {
 
     setState(() => _localError = null);
 
+    // Require real authentication — never auto-login on behalf of the user.
+    final authState = ref.read(authNotifierProvider);
+    if (!authState.isAuthenticated) {
+      // Close sheet before navigating so back-nav returns cleanly to event
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        context.push('/login?redirectTo=${Uri.encodeComponent('/event/${widget.eventId}')}');
+      }
+      return;
+    }
+
     final reservation = await ref.read(ticketingProvider.notifier).reserveTickets(
           ticketTypeId: tier.id,
           quantity: _quantity,
         );
 
+    // reservation == null means the notifier already set errorMessage — UI shows it via checkoutState.errorMessage
     if (reservation != null && mounted) {
       Navigator.of(context).pop(); // Close sheet
       context.push('/checkout');

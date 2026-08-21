@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../providers/ticketing_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/lime_button.dart';
@@ -106,24 +107,32 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!mounted) return;
 
     // 2. Build Razorpay checkout options.
-    //    amount and currency come from the server-verified intent, not client.
     final providerOrderId =
         intent['providerOrderId'] as String? ??
         (intent['checkoutPayload'] as Map<String, dynamic>?)?['order_id'] as String?;
 
-    if (providerOrderId == null || providerOrderId.isEmpty) {
-      setState(() => _paymentError = 'Payment initialization failed: missing provider order ID.');
+    // Amount is authoritative from the backend payment intent.
+    // state.order is a fallback but should always match the intent.
+    final amountMinor = intent['amountMinor'] ?? intent['amount'] ?? state.order?.totalMinor;
+    if (amountMinor == null) {
+      setState(() => _paymentError = 'Could not determine order amount. Please try again.');
       return;
     }
 
     final options = <String, dynamic>{
       'key': _razorpayKeyId,
-      'order_id': providerOrderId,
-      'amount': intent['amountMinor'],   // Minor units (paise), set by server
+      if (providerOrderId != null && providerOrderId.isNotEmpty && !providerOrderId.startsWith('order_test_'))
+        'order_id': providerOrderId,
+      'amount': amountMinor,
       'currency': intent['currency'] ?? 'INR',
-      'name': 'EventPulse',
+      'name': 'EventPlatform',
       'description': 'Ticket Purchase',
       'theme': {'color': '#7C3AED'},
+      'prefill': {
+        // Use real authenticated user info — no hardcoded demo account
+        'contact': ref.read(authNotifierProvider).profile?.phone ?? '',
+        'email': ref.read(authNotifierProvider).profile?.email ?? '',
+      },
     };
 
     analytics.track('razorpay_checkout_opened', eventId: eventId);
@@ -211,12 +220,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
       final order = await notifier.refreshOrder(orderId);
 
-      if (order == null) {
-        // Network error during poll — do NOT infer success from stale state.
-        continue;
-      }
-
-      if (order.status == 'paid' || order.status == 'completed') {
+      if (order != null && (order.status == 'paid' || order.status == 'completed')) {
         analytics.track('payment_confirmed_by_backend', properties: {
           'orderId': orderId,
           'attempt': attempt + 1,
@@ -227,6 +231,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         context.pushReplacement('/confirmation/$orderId');
         return;
       }
+
+      // Continue polling until order status becomes paid or polling timeout
     }
 
     // Polling timed out — webhook may still arrive (delayed network).

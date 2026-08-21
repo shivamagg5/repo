@@ -1,11 +1,15 @@
 // =============================================================================
 // Scanner Mobile — HTTP API Client Service
 // Integrates with DeviceKeyService to sign all device requests with DeviceAuthGuard headers.
+// FIX-007A: Integrated with shared ApiEnvelope for uniform response decoding
 // =============================================================================
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'device_key_service.dart';
+import '../core/api_envelope.dart';
+
+export '../core/api_envelope.dart' show ApiException;
 
 class ScannerApiService {
   final String baseUrl;
@@ -31,6 +35,7 @@ class ScannerApiService {
 
     return {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       if (authToken != null && authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
       ...deviceHeaders,
     };
@@ -47,15 +52,16 @@ class ScannerApiService {
       Uri.parse('$baseUrl/scanner/register'),
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       },
       body: jsonEncode({
         'deviceIdentifier': deviceIdentifier,
         'publicKeyPem': publicKeyPem,
-        'deviceModel': ?deviceModel,
+        if (deviceModel != null) 'deviceModel': deviceModel,
       }),
     );
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 
   /// Pair device to Event and Gate, retrieving signed Authorization Package
@@ -77,7 +83,7 @@ class ScannerApiService {
         'gateId': gateId,
       }),
     );
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 
   /// Download Event Authorization Package
@@ -92,7 +98,7 @@ class ScannerApiService {
 
     final uri = Uri.parse('$baseUrl$path?deviceId=$deviceId&gateId=$gateId');
     final res = await http.get(uri, headers: headers);
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 
   /// Perform Online Atomic Ticket Scan
@@ -116,7 +122,7 @@ class ScannerApiService {
         'deviceId': deviceId,
       }),
     );
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 
   /// Batch Sync Offline Scans
@@ -138,7 +144,7 @@ class ScannerApiService {
         'records': records,
       }),
     );
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 
   /// Search Attendees within assigned event scope (PII-minimized)
@@ -152,8 +158,7 @@ class ScannerApiService {
 
     final uri = Uri.parse('$baseUrl$path?eventId=$eventId&query=${Uri.encodeComponent(query)}');
     final res = await http.get(uri, headers: headers);
-    final data = jsonDecode(res.body);
-    return data is List ? data : (data['data'] ?? []);
+    return ApiEnvelope.unwrapList(res);
   }
 
   /// Perform Manual Checkin using unified backend transaction
@@ -177,6 +182,6 @@ class ScannerApiService {
         'deviceId': deviceId,
       }),
     );
-    return jsonDecode(res.body);
+    return ApiEnvelope.unwrapMap(res);
   }
 }

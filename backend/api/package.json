@@ -20,7 +20,9 @@
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:seed:staging": "ts-node src/scripts/staging-seed.ts",
-    "test:concurrency": "ts-node src/scripts/staging-concurrency-test.ts"
+    "db:inventory": "ts-node src/scripts/staging-schema-inventory.ts",
+    "test:concurrency": "ts-node src/scripts/staging-concurrency-test.ts",
+    "test:rls": "ts-node src/scripts/staging-rls-test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

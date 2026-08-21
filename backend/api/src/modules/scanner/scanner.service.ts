@@ -53,9 +53,19 @@ export class ScannerService {
     });
 
     if (existing) {
+      if (existing.status === 'revoked') {
+        throw new ForbiddenException({
+          code: 'DEVICE_REVOKED',
+          message: 'This scanner device hardware identifier has been revoked by the organization.',
+        });
+      }
+
       await this.db
         .update(checkinDevices)
-        .set({ lastSeenAt: new Date() })
+        .set({
+          publicKeyPem: input.publicKeyPem,
+          lastSeenAt: new Date(),
+        })
         .where(eq(checkinDevices.id, existing.id));
 
       return {
@@ -71,6 +81,7 @@ export class ScannerService {
       .values({
         organizationId,
         deviceIdentifier: input.deviceIdentifier,
+        publicKeyPem: input.publicKeyPem,
         status: 'active',
         lastSeenAt: new Date(),
       })
@@ -90,8 +101,12 @@ export class ScannerService {
 
   /**
    * Pair scanner device with an event and gate, issuing a signed Event Authorization Package.
+   *
+   * FIX-006: Enforces three-way org binding:
+   *   staff JWT org → device org → event org
+   * A mismatch at any layer returns 403 — no authorization package is issued.
    */
-  async pairDevice(input: DevicePairInput, staffUserId: string): Promise<EventAuthorizationPackageDto> {
+  async pairDevice(input: DevicePairInput, staffUserId: string, staffOrgId: string): Promise<EventAuthorizationPackageDto> {
     const device = await this.db.query.checkinDevices.findFirst({
       where: eq(checkinDevices.id, input.deviceId),
     });
@@ -100,12 +115,36 @@ export class ScannerService {
       throw new ForbiddenException('Scanner device is invalid or has been revoked');
     }
 
+    // FIX-006: Device must belong to the staff member's organization
+    if (device.organizationId !== staffOrgId) {
+      this.logger.warn(
+        `[Scanner] Cross-org pair attempt: staff org=${staffOrgId}, device org=${device.organizationId}, ` +
+        `deviceId=${device.id}, staffUserId=${staffUserId}`,
+      );
+      throw new ForbiddenException({
+        code: 'DEVICE_ORG_MISMATCH',
+        message: 'Scanner device does not belong to your organization.',
+      });
+    }
+
     const event = await this.db.query.events.findFirst({
       where: eq(events.id, input.eventId),
     });
 
     if (!event) {
       throw new NotFoundException(`Event with ID ${input.eventId} not found`);
+    }
+
+    // FIX-006: Event must also belong to the same organization
+    if (event.organizerOrganizationId !== staffOrgId) {
+      this.logger.warn(
+        `[Scanner] Cross-org event pair attempt: staff org=${staffOrgId}, event org=${event.organizerOrganizationId}, ` +
+        `eventId=${event.id}, staffUserId=${staffUserId}`,
+      );
+      throw new ForbiddenException({
+        code: 'EVENT_ORG_MISMATCH',
+        message: 'Event does not belong to your organization.',
+      });
     }
 
     const gate = await this.db.query.checkinGates.findFirst({

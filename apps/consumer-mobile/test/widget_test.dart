@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:consumer_mobile/screens/home_screen.dart';
+import 'package:consumer_mobile/screens/auth/login_screen.dart';
 import 'package:consumer_mobile/providers/auth_provider.dart';
 
 void main() {
-  testWidgets('HomeScreen renders brand and sign-in action when unauthenticated',
+  testWidgets('LoginScreen renders email and password form fields',
       (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -15,14 +15,13 @@ void main() {
           ),
         ],
         child: const MaterialApp(
-          home: HomeScreen(),
+          home: LoginScreen(),
         ),
       ),
     );
 
-    expect(find.text('Discover Events'), findsOneWidget);
-    expect(find.text('Find your next adventure ✦'), findsOneWidget);
-    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(find.text('Log In ✦'), findsOneWidget);
   });
 }
 
@@ -42,7 +41,11 @@ class _FakeAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier
   Future<void> signInWithApple() async {}
 
   @override
-  Future<void> signOut() async {
-    state = const AuthState(status: AuthStatus.unauthenticated);
-  }
+  Future<bool> signInWithDemoAccount() async => true;
+
+  @override
+  Future<void> signOut() async {}
+
+  @override
+  Future<void> refreshProfile() async {}
 }

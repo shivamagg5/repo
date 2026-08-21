@@ -1,14 +1,18 @@
 // =============================================================================
 // consumer-mobile — ApiService
 // Typed HTTP client for the backend API with auth and domain methods
+// FIX-007A: Integrated with shared ApiEnvelope for uniform response decoding
 // =============================================================================
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import '../core/api_envelope.dart';
 import '../models/ticket_model.dart';
 import '../models/order_model.dart';
 import '../models/reservation_model.dart';
+
+export '../core/api_envelope.dart' show ApiException;
 
 /// ApiService — typed HTTP client for the backend API.
 /// Automatically attaches Authorization header from Supabase session.
@@ -37,11 +41,7 @@ class ApiService {
       Uri.parse('$baseUrl$path'),
       headers: await _headers(),
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body);
-    final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as Map<String, dynamic>
-        : decoded as Map<String, dynamic>;
+    final data = ApiEnvelope.unwrapMap(res);
     return fromJson(data);
   }
 
@@ -50,11 +50,7 @@ class ApiService {
       Uri.parse('$baseUrl$path'),
       headers: await _headers(),
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body);
-    final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as List<dynamic>
-        : decoded as List<dynamic>;
+    final list = ApiEnvelope.unwrapList(res);
     return list.map((item) => fromJson(item as Map<String, dynamic>)).toList();
   }
 
@@ -69,11 +65,7 @@ class ApiService {
       headers: await _headers(customHeaders),
       body: body != null ? jsonEncode(body) : null,
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body);
-    final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as Map<String, dynamic>
-        : decoded as Map<String, dynamic>;
+    final data = ApiEnvelope.unwrapMap(res);
     return fromJson(data);
   }
 
@@ -90,7 +82,7 @@ class ApiService {
       {
         'ticketTypeId': ticketTypeId,
         'quantity': quantity,
-        ...?idempotencyKey == null ? null : {'idempotencyKey': idempotencyKey},
+        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
       },
       ReservationModel.fromJson,
       customHeaders: headers,
@@ -105,20 +97,23 @@ class ApiService {
   }
 
   Future<void> cancelReservation(String reservationId) async {
-    await http.post(
+    final res = await http.post(
       Uri.parse('$baseUrl/reservations/$reservationId/cancel'),
       headers: await _headers(),
     );
+    ApiEnvelope.unwrap(res);
   }
 
+  /// FIX-007A: Safely unwraps { data: { order: {...}, items: [...] } } or { data: {...} }
   Future<OrderModel> getOrder(String orderId) async {
     final res = await http.get(
       Uri.parse('$baseUrl/orders/$orderId'),
       headers: await _headers(),
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    final orderJson = decoded.containsKey('order') ? decoded['order'] as Map<String, dynamic> : decoded;
+    final data = ApiEnvelope.unwrapMap(res);
+    final orderJson = data.containsKey('order') && data['order'] is Map<String, dynamic>
+        ? data['order'] as Map<String, dynamic>
+        : data;
     return OrderModel.fromJson(orderJson);
   }
 
@@ -126,20 +121,21 @@ class ApiService {
     return getList<OrderModel>('/orders', OrderModel.fromJson);
   }
 
+  /// FIX-007A: Safely unwraps { data: { order: {...}, items: [...] } } or { data: {...} }
   Future<OrderModel> confirmOrderPayment(String orderId) async {
     final res = await http.post(
       Uri.parse('$baseUrl/orders/$orderId/confirm'),
       headers: await _headers(),
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    final orderJson = decoded.containsKey('order') ? decoded['order'] as Map<String, dynamic> : decoded;
+    final data = ApiEnvelope.unwrapMap(res);
+    final orderJson = data.containsKey('order') && data['order'] is Map<String, dynamic>
+        ? data['order'] as Map<String, dynamic>
+        : data;
     return OrderModel.fromJson(orderJson);
   }
 
   Future<Map<String, dynamic>> createPaymentIntent({
     required String orderId,
-    String provider = 'razorpay',
     String? idempotencyKey,
   }) async {
     final headers = idempotencyKey != null ? {'Idempotency-Key': idempotencyKey} : null;
@@ -147,8 +143,7 @@ class ApiService {
       '/payments/intent',
       {
         'orderId': orderId,
-        'provider': provider,
-        ...?idempotencyKey == null ? null : {'idempotencyKey': idempotencyKey},
+        if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
       },
       (data) => data,
       customHeaders: headers,
@@ -172,45 +167,7 @@ class ApiService {
       Uri.parse('$baseUrl/notifications/in-app'),
       headers: await _headers(),
     );
-    _assertSuccess(res);
-    final decoded = jsonDecode(res.body);
-    final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as List<dynamic>
-        : (decoded is List ? decoded : []);
+    final list = ApiEnvelope.unwrapList(res);
     return list.map((item) => item as Map<String, dynamic>).toList();
   }
-
-  void _assertSuccess(http.Response res) {
-    if (res.statusCode >= 200 && res.statusCode < 300) return;
-    try {
-      final body = jsonDecode(res.body);
-      throw ApiException(
-        statusCode: res.statusCode,
-        code: (body as Map<String, dynamic>)['code'] as String? ?? 'UNKNOWN',
-        message: body['message'] as String? ?? 'Request failed (${res.statusCode})',
-      );
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(
-        statusCode: res.statusCode,
-        code: 'HTTP_ERROR',
-        message: 'Request failed with status ${res.statusCode}',
-      );
-    }
-  }
-}
-
-class ApiException implements Exception {
-  final int statusCode;
-  final String code;
-  final String message;
-
-  const ApiException({
-    required this.statusCode,
-    required this.code,
-    required this.message,
-  });
-
-  @override
-  String toString() => 'ApiException($statusCode): [$code] $message';
 }

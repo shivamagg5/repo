@@ -64,6 +64,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/event/:slug',
         builder: (context, state) => EventDetailScreen(
           slug: state.pathParameters['slug'] ?? '',
+          extra: state.extra as Map<String, dynamic>?,
         ),
       ),
       GoRoute(
@@ -116,36 +117,51 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (BuildContext context, GoRouterState state) {
-      final isAuth = authState.isAuthenticated;
       final location = state.uri.path;
-      final isAuthScreen = location == '/login' ||
-          location == '/register' ||
-          location == '/forgot-password';
+
+      // ── Auth/onboarding screen checks ───────────────────────────────────
+      final isAuthScreen = location == '/login' || location == '/register' || location == '/forgot-password';
       final isOnboarding = location == '/onboarding';
 
-      // 1. If user is NOT authenticated
-      if (!isAuth) {
-        final hasCompletedOnboarding = onboardingState.value ?? false;
+      // ── Protected routes — require authentication ───────────────────────
+      const protectedRoutes = {'/checkout', '/tickets', '/notifications', '/orders', '/profile', '/confirmation'};
+      final isProtectedRoute = protectedRoutes.any((r) => location.startsWith(r));
 
-        // If user has not completed onboarding, force onboarding screen
-        if (!hasCompletedOnboarding) {
+      // ── 1. Auth is still loading (initial state) — don't redirect yet ──
+      if (authState.status == AuthStatus.initial) {
+        // Only redirect to onboarding if needed, otherwise hold
+        return isOnboarding ? null : null; // Wait for auth resolution
+      }
+
+      final isAuth = authState.isAuthenticated;
+
+      // ── 2. Onboarding state (3 values: loading=null, true, false) ───────
+      if (!isAuth && !isAuthScreen) {
+        // Only redirect to onboarding when we KNOW it hasn't been completed
+        // (value == false). If still loading (null), do NOT redirect.
+        final onboardingValue = onboardingState.value;
+        if (onboardingValue == false) {
           return isOnboarding ? null : '/onboarding';
         }
-
-        // If onboarding is completed, user MUST be on /login, /register, or /forgot-password
-        if (!isAuthScreen) {
-          final redirectTo = (location != '/' && !location.startsWith('/login') && !location.startsWith('/onboarding'))
+        // onboardingValue == true → onboarding done, show login for protected routes
+        // onboardingValue == null → still loading, don't redirect
+        if (onboardingValue == true && isProtectedRoute) {
+          final redirectTo = (location != '/' && !location.startsWith('/login'))
               ? '?redirectTo=${Uri.encodeComponent(location)}'
               : '';
           return '/login$redirectTo';
         }
-
-        return null;
       }
 
-      // 2. If user IS authenticated, redirect away from auth & onboarding screens to home
+      // ── 3. Authenticated users redirect away from auth/onboarding screens ──
       if (isAuth && (isAuthScreen || isOnboarding)) {
         return '/';
+      }
+
+      // ── 4. Protected routes require authentication ──────────────────────
+      if (!isAuth && isProtectedRoute) {
+        final redirectTo = '?redirectTo=${Uri.encodeComponent(location)}';
+        return '/login$redirectTo';
       }
 
       return null;

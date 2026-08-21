@@ -18,14 +18,33 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS — restrict origins in production
-  const corsEnv = process.env['CORS_ORIGINS'] ?? '*';
-  const corsOrigins = corsEnv === '*' ? true : corsEnv.split(',');
+  // CORS — strict origin enforcement in production
+  const isProduction = process.env['NODE_ENV'] === 'production';
+  const corsEnv = process.env['CORS_ORIGINS'];
+  
+  let corsOrigins: boolean | string[] = true;
+  if (isProduction) {
+    if (!corsEnv || corsEnv === '*') {
+      throw new Error('[FATAL CONFIG] CORS_ORIGINS must be explicitly configured with trusted domains in production.');
+    }
+    corsOrigins = corsEnv.split(',').map((o) => o.trim());
+  } else if (corsEnv && corsEnv !== '*') {
+    corsOrigins = corsEnv.split(',').map((o) => o.trim());
+  }
+
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-Id',
+      'X-Device-Id',
+      'X-Device-Timestamp',
+      'X-Device-Signature',
+      'Idempotency-Key',
+    ],
   });
 
   // Global interceptors and filters

@@ -14,8 +14,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Scanner Staff Access'), findsOneWidget);
-    expect(find.text('Authorize Scanner'), findsOneWidget);
+    expect(find.text('Gate Control Terminal'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
   });
 }

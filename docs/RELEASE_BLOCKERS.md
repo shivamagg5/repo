@@ -1,0 +1,20 @@
+# Release Blockers
+
+All blockers below must be resolved and verified in a staging environment before a customer-facing or gate-facing release.
+
+| ID | Blocker | Evidence | Required exit condition |
+| --- | --- | --- | --- |
+| RB-001 | API does not compile | `events.service.ts:852` omits `EventDetailPublicDto.ticketTypes`; `pnpm --filter @platform/api build` fails | Clean backend build and contract test for public event detail. |
+| RB-002 | Any buyer can create a mock payment intent and forge its webhook | `createPaymentIntentSchema` accepts arbitrary provider; `PaymentsService.getGateway('mock')`; `MockPaymentGateway` accepts literal `valid_mock_signature`; public `/payments/webhooks/mock` processes it | Mock adapter unreachable in production, provider server-selected, provider allowlist enforced, negative end-to-end test proves no client can self-pay. |
+| RB-003 | Failed Razorpay payment events can issue tickets | `processWebhook()` never allows only successful/captured event types before converting hold/order/tickets | Explicit provider event state mapping; signed failed/authorized/refund events do not mutate paid state; integration tests against Razorpay fixtures. |
+| RB-004 | Scanner offline verification is non-cryptographic | `apps/scanner-mobile/lib/core/crypto_service.dart`: package check returns true for non-empty signature; ticket check returns `signature.length >= 10` | Mobile verifies canonical payloads with ECDSA P-256/SHA-256 against a pinned root and verified package key. Forged values must fail. |
+| RB-005 | Scanner pairing/device identity is fabricated | Scanner client falls back to `dev-scanner-gate-01`, local authorization package, hardcoded gates/events; controller does not apply `DeviceAuthGuard`; registration discards `publicKeyPem` | No production fallback admission path; persist device public key; apply/use device guard; enforce device, gate, event, org and staff assignment. |
+| RB-006 | Scanner client/backend envelope and sync contracts do not interoperate | Backend wraps `{data,meta}`; `ScannerApiService` returns whole envelope; provider reads top-level `result`, `package`, `syncedSyncIds`, `conflicts`, while backend returns `data` and sync `results` | One tested scanner contract; successful online scan/pair/sync on real API and device. |
+| RB-007 | Production signing keys silently fall back to generated deterministic material | `ScannerCryptoService` warns and uses generated keys in production; backend test fails expected fail-fast | KMS/secret-backed stable keys and root key; production startup fails closed with no valid configured key. |
+| RB-008 | Migration authority is ambiguous and deployment does not apply migrations | Drizzle config targets `backend/api/src/database/migrations`; docs name `database/migrations` canonical; `render.yaml` has no migration step | Select one append-only migration directory, reconcile a fresh database and existing environment, and add a controlled migration job. |
+| RB-009 | Finance cannot reconcile real money | Payments/refunds never call ledger; `processRefund` does not call provider or insert `refunds`; settlements aggregate all orders/commissions | Atomic payment/refund posting, provider refund state, organization/event scoping, immutable balanced journals, finance integration tests. |
+| RB-010 | Consumer mobile checkout is contract-broken | `ApiService.getOrder()`/`confirmOrderPayment()` do not unwrap response `data`; `TicketingNotifier` swallows order load and payment requires `state.order` | Tested Android/iOS reservation → order → intent → webhook → wallet path. |
+| RB-011 | External production posture is unproven and permissive | `render.yaml`: `CORS_ORIGINS: '*'`; env template still labels payment/notifications placeholders; no secrets or webhook/device test evidence | Exact production origins, managed secrets, configured Supabase/Redis/Razorpay/FCM/email/SMS/KMS, health and rollback runbooks. |
+
+Do not waive RB-002 through RB-007 for a “test” scanner or payment release: those paths create false paid/admitted outcomes.
+

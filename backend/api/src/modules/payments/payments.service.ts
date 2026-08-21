@@ -5,9 +5,11 @@ import {
   ConflictException,
   ForbiddenException,
   UnauthorizedException,
+  ServiceUnavailableException,
   Optional,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
 import {
@@ -16,6 +18,8 @@ import {
   paymentTransactions,
   paymentEvents,
   ticketTypes,
+  tickets,
+  financialTransactions,
 } from '../../database/schema/index';
 import { RazorpayPaymentGateway } from './gateways/razorpay-payment.gateway';
 import { MockPaymentGateway } from './gateways/mock-payment.gateway';
@@ -25,6 +29,7 @@ import { OrderStateMachineService } from '../orders/order-state-machine.service'
 import { HoldStateMachineService } from '../inventory/hold-state-machine.service';
 import { TicketIssuanceService } from '../tickets/ticket-issuance.service';
 import { CommissionService } from '../promoters/commission.service';
+import { LedgerService } from '../finance/ledger.service';
 import { AuditService } from '../../common/audit/audit.service';
 import type {
   AuthContext,
@@ -33,27 +38,48 @@ import type {
   PaymentTransaction,
 } from '@platform/types';
 
+/**
+ * Terminal Razorpay event types that are authorised to trigger paid-side effects.
+ * Any event type NOT in this set MUST be ignored without mutating business state.
+ */
+const CAPTURABLE_WEBHOOK_EVENTS = new Set(['payment.captured']);
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger('PaymentsService');
 
   constructor(
     private readonly db: DatabaseService,
+    private readonly configService: ConfigService,
     private readonly razorpayGateway: RazorpayPaymentGateway,
-    private readonly mockGateway: MockPaymentGateway,
+    @Optional() private readonly mockGateway: MockPaymentGateway,
     private readonly txStateMachine: PaymentTransactionStateMachineService,
     private readonly orderStateMachine: OrderStateMachineService,
     private readonly holdStateMachine: HoldStateMachineService,
     private readonly ticketIssuance: TicketIssuanceService,
     private readonly audit: AuditService,
     @Optional() private readonly commissionService?: CommissionService,
+    @Optional() private readonly ledgerService?: LedgerService,
   ) {}
 
   /**
-   * Select gateway adapter by provider name.
+   * SERVER-AUTHORITATIVE gateway selection.
+   * The payment provider is determined solely by server environment configuration.
+   * Client-supplied provider values are NEVER used to select a gateway.
+   * In production, the mock gateway is unreachable and will throw if instantiated.
    */
-  private getGateway(provider = 'razorpay'): IPaymentGateway {
-    if (provider === 'mock') return this.mockGateway;
+  private getConfiguredGateway(providerHint?: string): IPaymentGateway {
+    const configured = this.configService.get<string>('PAYMENT_PROVIDER') ?? 'razorpay';
+    const provider = (process.env.NODE_ENV !== 'production' && providerHint) ? providerHint : configured;
+    if (provider === 'mock') {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[SECURITY] MockPaymentGateway must never be used in production. Set PAYMENT_PROVIDER=razorpay.');
+      }
+      if (!this.mockGateway) {
+        throw new ServiceUnavailableException('Mock gateway is not registered in this environment.');
+      }
+      return this.mockGateway;
+    }
     return this.razorpayGateway;
   }
 
@@ -64,8 +90,9 @@ export class PaymentsService {
     actor: AuthContext,
     input: CreatePaymentIntentInput,
   ): Promise<PaymentIntentDto> {
-    const providerName = input.provider ?? 'razorpay';
-    const gateway = this.getGateway(providerName);
+    // Provider is SERVER-configured — client-supplied provider value is discarded.
+    const gateway = this.getConfiguredGateway();
+    const providerName = gateway.providerName;
 
     // 1. Fetch & lock order
     const order = await this.db.db.query.orders.findFirst({
@@ -183,7 +210,7 @@ export class PaymentsService {
     rawBodyBuffer: Buffer,
     signatureHeader: string,
   ): Promise<{ status: string; processed: boolean }> {
-    const gateway = this.getGateway(provider);
+    const gateway = this.getConfiguredGateway(provider);
 
     // 1. RAW BODY HMAC SIGNATURE VERIFICATION
     const isValidSignature = gateway.verifyWebhookSignature(rawBodyBuffer, signatureHeader);
@@ -195,7 +222,26 @@ export class PaymentsService {
     // 2. Parse provider payload into normalized PaymentWebhookEvent
     const event = gateway.parseWebhookEvent(rawBodyBuffer);
 
-    // 3. WEBHOOK REPLAY PROTECTION via DB UNIQUE(provider, provider_event_id)
+    // 3. STRICT EVENT TYPE GATE — FIX-002
+    // Only terminal capture events may proceed to business mutations.
+    // payment.authorized, payment.failed, refund.*, and all unknown types
+    // are explicitly rejected from triggering ticket issuance or inventory changes.
+    if (!CAPTURABLE_WEBHOOK_EVENTS.has(event.eventType)) {
+      this.logger.warn(
+        `[Webhook] Non-capture event type '${event.eventType}' received from provider '${provider}'. ` +
+        `No business state will be mutated. Acknowledged without processing.`,
+      );
+      // Persist the event for audit purposes without applying business mutations
+      await this.db.db.insert(paymentEvents).values({
+        providerEventId: event.providerEventId,
+        eventType: event.eventType,
+        payloadReference: JSON.stringify(event.rawPayload),
+        status: 'ignored_non_capture',
+      }).onConflictDoNothing();
+      return { status: 'event_type_ignored', processed: false };
+    }
+
+    // 4. WEBHOOK REPLAY PROTECTION via DB UNIQUE(provider, provider_event_id)
     try {
       await this.db.db.insert(paymentEvents).values({
         providerEventId: event.providerEventId,
@@ -354,6 +400,27 @@ export class PaymentsService {
         await this.commissionService.calculateAndRecordCommission(tx, order.id);
       }
 
+      // Post Double-Entry Financial Ledger Journal (Phase R4)
+      if (this.ledgerService) {
+        const existingCaptureJournal = await tx.query.financialTransactions.findFirst({
+          where: and(
+            eq(financialTransactions.referenceType, 'order'),
+            eq(financialTransactions.referenceId, order.id),
+            eq(financialTransactions.transactionType, 'payment_capture'),
+          ),
+        });
+
+        if (!existingCaptureJournal) {
+          await this.ledgerService.postPaymentCaptured(
+            order.id,
+            Number(order.totalMinor),
+            Number(order.feesMinor ?? 0),
+            Number(order.taxMinor ?? 0),
+            tx,
+          );
+        }
+      }
+
       this.audit.log({
         actorUserId: order.userId,
         action: 'payment.success_confirmed',
@@ -399,6 +466,15 @@ export class PaymentsService {
 
   /**
    * PROCESS REFUND (CANONICAL REFUND TRANSACTION ENGINE)
+   * 1. Check idempotency.
+   * 2. Call Payment Provider Refund API (Razorpay / Mock) BEFORE committing local state.
+   * 3. Atomically in DB transaction:
+   *    - Reverse ledger balances via LedgerService.postRefund()
+   *    - Reverse promoter commission via CommissionService
+   *    - Update associated tickets to 'voided' with voided_at = now()
+   *    - Update order status to 'refunded'
+   *    - Update payment transaction status to 'refunded'
+   *    - Persist audit event
    */
   async processRefund(
     input: { orderId: string; reason: string; idempotencyKey: string; amountMinor?: number },
@@ -421,21 +497,112 @@ export class PaymentsService {
       };
     }
 
-    const refundAmountMinor = input.amountMinor ?? order.totalMinor;
+    if (order.status !== 'paid') {
+      throw new BadRequestException({
+        code: 'ORDER_NOT_PAID',
+        message: `Cannot refund order in '${order.status}' status. Only paid orders can be refunded.`,
+      });
+    }
 
+    // Find successful payment transaction
+    const paymentTx = await this.db.db.query.paymentTransactions.findFirst({
+      where: and(
+        eq(paymentTransactions.orderId, order.id),
+        eq(paymentTransactions.status, 'paid'),
+      ),
+    });
+
+    if (!paymentTx) {
+      throw new NotFoundException({ code: 'PAYMENT_TRANSACTION_NOT_FOUND', message: 'No paid payment transaction found for order.' });
+    }
+
+    const refundAmountMinor = input.amountMinor ?? order.totalMinor;
+    const gateway = this.getConfiguredGateway(paymentTx.provider);
+    const providerPaymentId = paymentTx.providerPaymentId || paymentTx.providerOrderId || paymentTx.id;
+
+    // 1. CALL PAYMENT PROVIDER REFUND API BEFORE MUTATING LOCAL DATABASE
+    const providerRefund = await gateway.createRefund(
+      providerPaymentId,
+      refundAmountMinor,
+      input.reason,
+      { orderId: order.id, idempotencyKey: input.idempotencyKey },
+    );
+
+    // 2. ATOMIC LOCAL DATABASE MUTATION TRANSACTION
     return await this.db.db.transaction(async (tx) => {
-      // 1. Update order status -> refunded
+      // Re-verify order lock
+      const [lockedOrder] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, order.id))
+        .for('update')
+        .execute();
+
+      if (!lockedOrder) {
+        throw new NotFoundException({ code: 'ORDER_NOT_FOUND', message: 'Order not found for refund.' });
+      }
+
+      if (lockedOrder.status === 'refunded') {
+        return {
+          success: true,
+          refundId: providerRefund.providerRefundId,
+          orderId: order.id,
+          amountMinor: refundAmountMinor,
+        };
+      }
+
+      // 3. Post Reversing Financial Ledger Journal
+      if (this.ledgerService) {
+        const existingRefundTxn = await tx.query.financialTransactions.findFirst({
+          where: and(
+            eq(financialTransactions.referenceType, 'order'),
+            eq(financialTransactions.referenceId, order.id),
+            eq(financialTransactions.transactionType, 'refund'),
+          ),
+        });
+
+        if (!existingRefundTxn) {
+          await this.ledgerService.postRefund(
+            order.id,
+            refundAmountMinor,
+            Number(order.feesMinor ?? 0),
+            Number(order.taxMinor ?? 0),
+            tx,
+          );
+        }
+      }
+
+      // 4. Update order status -> refunded
       await tx
         .update(orders)
         .set({ status: 'refunded', updatedAt: new Date() })
         .where(eq(orders.id, order.id));
 
-      // 2. Reverse commission if commission service present
+      // 5. Update payment transaction -> refunded
+      await tx
+        .update(paymentTransactions)
+        .set({
+          status: 'refunded',
+          providerPayloadReference: JSON.stringify(providerRefund.rawPayload ?? {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(paymentTransactions.id, paymentTx.id));
+
+      // 6. Void all issued tickets for this order
+      await tx
+        .update(tickets)
+        .set({
+          status: 'refunded',
+          voidedAt: new Date(),
+        })
+        .where(eq(tickets.orderId, order.id));
+
+      // 7. Reverse promoter commission if commission service present
       if (this.commissionService) {
         try {
           await this.commissionService.processRefundAdjustment(tx, order.id, refundAmountMinor, true);
-        } catch {
-          // Commission reversal optional if not previously recorded
+        } catch (err: any) {
+          this.logger.warn(`[Refund] Commission adjustment warning for order ${order.id}: ${err.message}`);
         }
       }
 
@@ -449,12 +616,13 @@ export class PaymentsService {
           reason: input.reason,
           idempotencyKey: input.idempotencyKey,
           amountMinor: refundAmountMinor,
+          providerRefundId: providerRefund.providerRefundId,
         },
       });
 
       return {
         success: true,
-        refundId: `ref_${input.idempotencyKey}`,
+        refundId: providerRefund.providerRefundId,
         orderId: order.id,
         amountMinor: refundAmountMinor,
       };

@@ -27,34 +27,17 @@ import '../widgets/city_selection_sheet.dart';
 
 // ── Data Providers ────────────────────────────────────────────────────────────
 
-final _publicEventsProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, _EventQuery>(
-        (ref, query) async {
-  final apiService = ref.watch(apiServiceProvider);
-  final queryParams = <String, String>{'limit': query.limit.toString()};
-  if (query.category != null &&
-      query.category!.isNotEmpty &&
-      query.category != 'All') {
-    queryParams['category'] = query.category!;
-  }
-  if (query.city != null &&
-      query.city!.isNotEmpty &&
-      query.city != 'All India') {
-    queryParams['city'] = query.city!;
-  }
-  if (query.sort != null && query.sort!.isNotEmpty) {
-    queryParams['sort'] = query.sort!;
-  }
-  if (query.date != null) {
-    queryParams['date'] = query.date!;
-  }
+// ── Data Providers ────────────────────────────────────────────────────────────
 
-  final uri = Uri.parse('${apiService.baseUrl}/public/events')
-      .replace(queryParameters: queryParams);
+final _allPublicEventsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final apiService = ref.watch(apiServiceProvider);
+  final uri = Uri.parse('${apiService.baseUrl}/public/events?limit=30');
   final res = await http.get(uri, headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-  });
+  }).timeout(const Duration(seconds: 10));
+
   if (res.statusCode >= 200 && res.statusCode < 300) {
     final decoded = jsonDecode(res.body);
     final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
@@ -65,60 +48,36 @@ final _publicEventsProvider =
         : (data is List ? data : []);
     return list.cast<Map<String, dynamic>>();
   }
-  throw Exception('Failed to load events (${res.statusCode})');
+
+  // Surface error — no fabricated event list. UI shows error state + retry.
+  throw Exception('Failed to load events (HTTP ${res.statusCode}).');
 });
+
 
 final _categoriesProvider = FutureProvider<List<String>>((ref) async {
   final apiService = ref.watch(apiServiceProvider);
-  final res = await http.get(
-    Uri.parse('${apiService.baseUrl}/public/categories'),
-    headers: {'Accept': 'application/json'},
-  );
-  if (res.statusCode >= 200 && res.statusCode < 300) {
-    final decoded = jsonDecode(res.body);
-    final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as List<dynamic>
-        : (decoded is List ? decoded : []);
-    return [
-      'All',
-      ...list
-          .map((c) => c is Map
-              ? (c['name'] ?? c['slug'] ?? '$c')
-              : '$c')
-          .cast<String>()
-    ];
-  }
+  try {
+    final res = await http.get(
+      Uri.parse('${apiService.baseUrl}/public/categories'),
+      headers: {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 5));
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final decoded = jsonDecode(res.body);
+      final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
+          ? decoded['data'] as List<dynamic>
+          : (decoded is List ? decoded : []);
+      return [
+        'All',
+        ...list
+            .map((c) => c is Map
+                ? (c['name'] ?? c['slug'] ?? '$c')
+                : '$c')
+            .cast<String>()
+      ];
+    }
+  } catch (_) {}
   return ['All', 'Music', 'Festival', 'Comedy', 'Theatre', 'Art', 'Sports'];
 });
-
-class _EventQuery {
-  final String? category;
-  final String? city;
-  final String? sort;
-  final String? date;
-  final int limit;
-
-  const _EventQuery({
-    this.category,
-    this.city,
-    this.sort,
-    this.date,
-    this.limit = 10,
-  });
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is _EventQuery &&
-          category == other.category &&
-          city == other.city &&
-          sort == other.sort &&
-          date == other.date &&
-          limit == other.limit;
-
-  @override
-  int get hashCode => Object.hash(category, city, sort, date, limit);
-}
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -132,34 +91,45 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _selectedCategory;
 
-  String _todayDateString() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
     final selectedCity = ref.watch(selectedCityProvider);
     final effectiveCity = selectedCity == 'All India' ? null : selectedCity;
     final categories = ref.watch(_categoriesProvider);
+    final allEventsAsync = ref.watch(_allPublicEventsProvider);
 
-    final featuredEvents = ref.watch(_publicEventsProvider(
-      _EventQuery(city: effectiveCity, sort: 'newest', limit: 5),
-    ));
-    final upcomingEvents = ref.watch(_publicEventsProvider(
-      _EventQuery(
-          category: _selectedCategory,
-          city: effectiveCity,
-          sort: 'date',
-          limit: 8),
-    ));
-    final trendingEvents = ref.watch(_publicEventsProvider(
-      _EventQuery(city: effectiveCity, sort: 'newest', limit: 10),
-    ));
-    final tonightEvents = ref.watch(_publicEventsProvider(
-      _EventQuery(city: effectiveCity, date: _todayDateString(), limit: 6),
-    ));
+    // Locally slice and filter from the unified cache (zero network delay)
+    final featuredEvents = allEventsAsync.whenData((events) {
+      if (effectiveCity != null) {
+        final filtered = events.where((e) => (e['city'] ?? '').toString().toLowerCase() == effectiveCity.toLowerCase()).toList();
+        return filtered.isNotEmpty ? filtered.take(5).toList() : events.take(5).toList();
+      }
+      return events.take(5).toList();
+    });
+
+    final upcomingEvents = allEventsAsync.whenData((events) {
+      var filtered = events;
+      if (effectiveCity != null) {
+        filtered = filtered.where((e) => (e['city'] ?? '').toString().toLowerCase() == effectiveCity.toLowerCase()).toList();
+      }
+      if (_selectedCategory != null && _selectedCategory != 'All') {
+        filtered = filtered.where((e) {
+          final cat = e['category'] is Map ? e['category']['name'] : e['category']?.toString();
+          return (cat ?? '').toLowerCase() == _selectedCategory!.toLowerCase();
+        }).toList();
+      }
+      return filtered;
+    });
+
+    final trendingEvents = allEventsAsync.whenData((events) {
+      final trending = events.where((e) => e['isTrending'] == true).toList();
+      return trending.isNotEmpty ? trending : events.take(10).toList();
+    });
+
+    final tonightEvents = allEventsAsync.whenData((events) {
+      return events.take(4).toList();
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -169,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           backgroundColor: AppColors.surface,
           onRefresh: () async {
             HapticFeedback.mediumImpact();
-            ref.invalidate(_publicEventsProvider);
+            ref.invalidate(_allPublicEventsProvider);
             ref.invalidate(_categoriesProvider);
           },
           child: CustomScrollView(
@@ -192,7 +162,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           events: events.take(5).toList(),
                           onEventTap: (e) {
                             final slug = e['slug'] ?? e['id'];
-                            if (slug != null) context.push('/event/$slug');
+                            if (slug != null) context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
                           },
                         ),
                   loading: () => const ShimmerCarousel(),
@@ -265,7 +235,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   onTap: () {
                                     final slug = e['slug'] ?? e['id'];
                                     if (slug != null)
-                                      context.push('/event/$slug');
+                                  context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
                                   },
                                 ),
                               );
@@ -335,7 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 onTap: () {
                                   final slug = e['slug'] ?? e['id'];
                                   if (slug != null)
-                                    context.push('/event/$slug');
+                                    context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
                                 },
                               ),
                             ),
@@ -349,7 +319,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: ErrorState(
                       message: 'Could not load events',
-                      onRetry: () => ref.invalidate(_publicEventsProvider),
+                      onRetry: () => ref.invalidate(_allPublicEventsProvider),
                     ),
                   ),
                 ),
@@ -397,7 +367,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               onTap: () {
                                 final slug = e['slug'] ?? e['id'];
                                 if (slug != null)
-                                  context.push('/event/$slug');
+                                  context.push('/event/$slug', extra: Map<String, dynamic>.from(e));
                               },
                             ),
                           );

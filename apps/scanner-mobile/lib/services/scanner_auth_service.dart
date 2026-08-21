@@ -77,14 +77,6 @@ class BasicScannerAuthService implements ScannerAuthService {
 
   @override
   Future<bool> signIn(String email, String password) async {
-    // 1. Instant Staff Test / Demo Bypass
-    if ((email.trim().toLowerCase() == 'staff@eventplatform.com' || email.trim().toLowerCase() == 'demo@eventplatform.com' || email.trim().toLowerCase() == 'staff@club.com') &&
-        (password == 'Staff123!' || password == 'demo123' || password == '123456' || password == 'password')) {
-      await _storage.write(key: _sessionKey, value: 'demo_staff_session_token');
-      return true;
-    }
-
-    // 2. Production Supabase Auth
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email.trim(),
@@ -95,12 +87,8 @@ class BasicScannerAuthService implements ScannerAuthService {
         return true;
       }
       return false;
-    } catch (_) {
-      // If network offline or dev mode, allow valid email & password
-      if (email.contains('@') && password.length >= 6) {
-        await _storage.write(key: _sessionKey, value: 'offline_staff_session_token');
-        return true;
-      }
+    } catch (e) {
+      // Strict auth error — no synthetic fallback session
       return false;
     }
   }

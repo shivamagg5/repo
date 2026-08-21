@@ -358,6 +358,7 @@ export const checkinDevices = pgTable('checkin_devices', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
   deviceIdentifier: text('device_identifier').unique().notNull(),
+  publicKeyPem: text('public_key_pem'),
   status: text('status').notNull().default('active'),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
 });
