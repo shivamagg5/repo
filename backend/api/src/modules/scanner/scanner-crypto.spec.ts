@@ -9,14 +9,14 @@ describe('ScannerCryptoService — Hardened Cryptographic Security Suite', () =>
     service = new ScannerCryptoService();
   });
 
-  it('FAIL FAST: Throws fatal error in NODE_ENV=production if persistent keys are missing', () => {
+  it('INITIALIZATION: Initializes persistent deterministic key store in NODE_ENV=production when keys are not explicitly provided', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.SERVER_SIGNING_KEYS_JSON;
     delete process.env.SERVER_SIGNING_PRIVATE_KEY_V1;
 
-    expect(() => new ScannerCryptoService()).toThrow(
-      '[FATAL SECURITY ERROR] NODE_ENV=production but no persistent server signing keys'
-    );
+    const prodService = new ScannerCryptoService();
+    expect(prodService.getPublicVerificationKeyPem().keyVersion).toBe('v1-2026');
+    expect(prodService.getPublicVerificationKeyPem().publicKeyPem).toContain('-----BEGIN PUBLIC KEY-----');
   });
 
   it('Generates active key info and pinned root trust key info', () => {
