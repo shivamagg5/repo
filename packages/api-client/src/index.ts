@@ -521,6 +521,10 @@ export class ApiClient {
     return this.post<T>(`/admin/events/${encodeURIComponent(id)}/review`, body);
   }
 
+  async listAdminOrders<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/orders', params);
+  }
+
   async inspectAdminOrder<T>(id: string): Promise<ApiSuccess<T>> {
     return this.get<T>(`/admin/orders/${encodeURIComponent(id)}`);
   }

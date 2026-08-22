@@ -283,6 +283,53 @@ export class AdminService {
   }
 
   /**
+   * List orders with pagination and filtering for administrative oversight.
+   */
+  async listOrders(query: { status?: string; search?: string; cursor?: string; limit?: number }) {
+    const limit = Math.min(query.limit ?? 20, 100);
+    const db = this.databaseService.db;
+
+    const conditions: any[] = [];
+    if (query.status && query.status !== 'all') {
+      conditions.push(eq(orders.status, query.status as any));
+    }
+    if (query.cursor) {
+      conditions.push(lt(orders.id, query.cursor));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const rows = await db.query.orders.findMany({
+      where: whereClause,
+      with: {
+        user: true,
+        event: true,
+      },
+      limit: limit + 1,
+      orderBy: [desc(orders.createdAt)],
+    });
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.id : null;
+
+    const data = items.map((o: any) => ({
+      id: o.id,
+      userId: o.userId,
+      eventId: o.eventId,
+      eventTitle: o.event?.title ?? 'Event',
+      purchaserName: o.user?.name ?? 'Purchaser',
+      purchaserEmail: o.user?.email ?? 'purchaser@example.com',
+      status: o.status,
+      totalMinor: o.totalMinor,
+      currency: o.currency,
+      createdAt: o.createdAt.toISOString(),
+    }));
+
+    return { data, nextCursor, hasMore };
+  }
+
+  /**
    * Inspect order details for admin support.
    */
   async inspectOrder(orderId: string): Promise<AdminOrderInspectionDto> {

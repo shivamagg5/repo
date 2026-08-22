@@ -58,6 +58,18 @@ export class AdminController {
     return this.adminService.reviewEvent(eventId, validated as AdminEventReviewInput, actor);
   }
 
+  @Get('orders')
+  @RequirePermissions('order.view' as any)
+  async listOrders(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.adminService.listOrders({ status, search, cursor, limit: parsedLimit });
+  }
+
   @Get('orders/:id')
   @RequirePermissions('order.view' as any)
   async inspectOrder(@Param('id', ParseUUIDPipe) orderId: string) {

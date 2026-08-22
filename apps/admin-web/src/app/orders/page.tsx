@@ -1,18 +1,40 @@
 // =============================================================================
-// admin-web — Order Inspection & Refunds
-// Inspect order records and issue authoritative refunds with idempotency keys.
+// admin-web — Order Inspection, Management & Refunds
+// Live order directory, status filters, deep order inspection, and authoritative refunds.
 // =============================================================================
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiClient, ApiError } from '../../lib/api';
+import { Badge, Button, Card, Skeleton } from '@platform/ui';
+
+interface AdminOrderSummary {
+  id: string;
+  userId: string;
+  eventId: string;
+  eventTitle: string;
+  purchaserName: string;
+  purchaserEmail: string;
+  status: 'pending' | 'paid' | 'cancelled' | 'refunded';
+  totalMinor: number;
+  currency: string;
+  createdAt: string;
+}
 
 export default function AdminOrdersPage() {
+  const [ordersList, setOrdersList] = useState<AdminOrderSummary[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [orderIdInput, setOrderIdInput] = useState('');
-  const [orderData, setOrderData] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Order Details Modal State
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [inspectError, setInspectError] = useState<string | null>(null);
 
   // Refund Modal State
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -22,25 +44,56 @@ export default function AdminOrdersPage() {
   const [refundError, setRefundError] = useState<string | null>(null);
   const [refundSuccess, setRefundSuccess] = useState<string | null>(null);
 
-  const handleInspect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const id = orderIdInput.trim();
-    if (!id) return;
-
-    setLoading(true);
-    setError(null);
+  const fetchOrders = useCallback(async () => {
+    setLoadingList(true);
+    setListError(null);
     try {
-      const res = await apiClient.inspectAdminOrder<any>(id);
-      setOrderData(res.data);
+      const params: Record<string, string> = { limit: '50' };
+      if (selectedStatus !== 'all') params['status'] = selectedStatus;
+      if (searchQuery.trim()) params['search'] = searchQuery.trim();
+
+      const res = await apiClient.listAdminOrders<any>(params);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+      setOrdersList(list);
     } catch (err: any) {
       if (err instanceof ApiError) {
-        setError(err.message || 'Order not found or access denied.');
+        setListError(err.message || 'Failed to retrieve orders directory.');
       } else {
-        setError(err?.message || 'Error occurred while looking up order.');
+        setListError(err?.message || 'Error occurred while loading orders.');
       }
-      setOrderData(null);
     } finally {
-      setLoading(false);
+      setLoadingList(false);
+    }
+  }, [selectedStatus, searchQuery]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const inspectOrderById = async (id: string) => {
+    setInspectLoading(true);
+    setInspectError(null);
+    try {
+      const res = await apiClient.inspectAdminOrder<any>(id);
+      setSelectedOrder(res.data);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setInspectError(err.message || 'Order not found or access denied.');
+      } else {
+        setInspectError(err?.message || 'Error occurred while inspecting order.');
+      }
+      setSelectedOrder(null);
+    } finally {
+      setInspectLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (orderIdInput.trim()) {
+      inspectOrderById(orderIdInput.trim());
+    } else {
+      fetchOrders();
     }
   };
 
@@ -54,23 +107,22 @@ export default function AdminOrdersPage() {
 
   const handleRefundSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderData?.id || !refundReason.trim()) return;
+    if (!selectedOrder?.id || !refundReason.trim()) return;
 
     setRefunding(true);
     setRefundError(null);
     try {
-      await apiClient.refundAdminOrder(orderData.id, {
+      await apiClient.refundAdminOrder(selectedOrder.id, {
         reason: refundReason.trim(),
         idempotencyKey: idempotencyKey.trim(),
       });
 
-      setRefundSuccess('Refund successfully initiated and recorded in ledger.');
+      setRefundSuccess('Refund successfully initiated and recorded in general ledger.');
       setTimeout(async () => {
         setShowRefundModal(false);
-        // Refresh order inspection
-        const updated = await apiClient.inspectAdminOrder<any>(orderData.id);
-        setOrderData(updated.data);
-      }, 1500);
+        await inspectOrderById(selectedOrder.id);
+        await fetchOrders();
+      }, 1200);
     } catch (err: any) {
       if (err instanceof ApiError) {
         setRefundError(err.message || 'Failed to process refund.');
@@ -83,126 +135,294 @@ export default function AdminOrdersPage() {
   };
 
   const formatCurrency = (minor: number, currency: string = 'INR') => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(minor / 100);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(minor / 100);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <Badge variant="success" size="sm">Paid</Badge>;
+      case 'refunded':
+        return <Badge variant="danger" size="sm">Refunded</Badge>;
+      case 'pending':
+        return <Badge variant="warning" size="sm">Pending</Badge>;
+      case 'cancelled':
+        return <Badge variant="neutral" size="sm">Cancelled</Badge>;
+      default:
+        return <Badge variant="neutral" size="sm">{status}</Badge>;
+    }
   };
 
   return (
     <AdminLayout
-      title="Order Inspection & Refunds"
-      subtitle="Inspect order ledger items, verify tickets, and issue authoritative refund transactions"
+      title="Orders & Refund Operations"
+      subtitle="Authoritative platform order ledger, ticket verification, and financial refund management"
+      actions={
+        <Button variant="secondary" size="sm" onClick={fetchOrders}>
+          🔄 Refresh Orders
+        </Button>
+      }
     >
       <div className="space-y-6">
-        {/* Lookup Bar */}
-        <div className="bg-[#0C101A] p-5 rounded-2xl border border-slate-800">
-          <form onSubmit={handleInspect} className="flex flex-wrap gap-3 items-center">
+        {/* Search & Direct Lookup Bar */}
+        <Card variant="elevated" padding="md">
+          <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3 items-center">
             <div className="flex-1 min-w-[280px]">
               <input
                 type="text"
-                required
                 value={orderIdInput}
                 onChange={(e) => setOrderIdInput(e.target.value)}
-                placeholder="Enter complete Order ID (e.g. 00000000-0000-0000-0000-000000000000)..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-red-500 font-mono"
+                placeholder="Lookup Order ID (UUID) or search purchaser / event..."
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500 font-mono"
               />
             </div>
             <button
               type="submit"
-              disabled={loading || !orderIdInput.trim()}
-              className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
+              disabled={inspectLoading}
+              className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {loading ? 'Inspecting...' : '🔍 Inspect Order'}
+              {inspectLoading ? 'Inspecting...' : '🔍 Inspect Order'}
             </button>
           </form>
+        </Card>
+
+        {/* Filter Status Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0C101A] p-3 rounded-2xl border border-slate-800">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {['all', 'paid', 'pending', 'refunded', 'cancelled'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setSelectedStatus(tab)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+                  selectedStatus === tab
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-xs text-slate-400 font-mono">
+            Showing <strong className="text-white">{ordersList.length}</strong> orders
+          </div>
         </div>
 
         {/* Error State */}
-        {error && (
+        {listError && (
           <div className="p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs">
-            {error}
+            {listError}
           </div>
         )}
 
-        {/* Order Details Panel */}
-        {orderData && (
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
-            <div className="flex flex-wrap justify-between items-start gap-4 pb-4 border-b border-slate-800">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Order ID</span>
-                <h3 className="text-lg font-bold text-white font-mono">{orderData.id}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Placed on {new Date(orderData.createdAt).toLocaleString('en-IN')}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
-                  {orderData.status}
-                </span>
-                {orderData.status === 'paid' && (
+        {/* Orders Table */}
+        <Card variant="elevated" padding="none">
+          {loadingList ? (
+            <div className="p-6 space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} height="48px" variant="rect" />
+              ))}
+            </div>
+          ) : ordersList.length === 0 ? (
+            <div className="py-16 text-center text-xs text-slate-400">
+              No orders found matching the selected filter.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                    <th className="py-3 px-4">Order ID</th>
+                    <th className="py-3 px-4">Purchaser</th>
+                    <th className="py-3 px-4">Event</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Created At</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {ordersList.map((ord) => (
+                    <tr key={ord.id} className="hover:bg-slate-900/40 transition-colors">
+                      <td className="py-3.5 px-4 font-mono text-purple-300 font-semibold">
+                        {ord.id.substring(0, 8)}...
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-200">{ord.purchaserName || 'Customer'}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{ord.purchaserEmail}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-300 font-medium max-w-[200px] truncate">
+                        {ord.eventTitle || 'Event'}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
+                        {formatCurrency(ord.totalMinor, ord.currency)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {getStatusBadge(ord.status)}
+                      </td>
+                      <td className="py-3.5 px-4 text-[11px] text-slate-400 font-mono">
+                        {new Date(ord.createdAt).toLocaleDateString('en-IN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => inspectOrderById(ord.id)}
+                          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+                        >
+                          Inspect →
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {/* Deep Order Inspection Modal */}
+        {selectedOrder && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="glass-panel p-6 rounded-2xl border border-slate-800 max-w-2xl w-full space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex flex-wrap justify-between items-start gap-4 pb-4 border-b border-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Order ID</span>
+                  <h3 className="text-lg font-bold text-white font-mono">{selectedOrder.id}</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Placed on {new Date(selectedOrder.createdAt).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {getStatusBadge(selectedOrder.status)}
+                  {selectedOrder.status === 'paid' && (
+                    <button
+                      onClick={openRefundModal}
+                      className="px-4 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30 font-bold text-xs transition-colors"
+                    >
+                      Issue Refund
+                    </button>
+                  )}
                   <button
-                    onClick={openRefundModal}
-                    className="px-4 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30 font-bold text-xs transition-colors"
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-1 text-slate-400 hover:text-white"
                   >
-                    Issue Refund
+                    ✕
                   </button>
+                </div>
+              </div>
+
+              {/* Purchaser & Event Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Purchaser Profile</p>
+                  <p className="text-xs font-semibold text-slate-200">{selectedOrder.purchaserName}</p>
+                  <p className="text-xs text-slate-400 font-mono">{selectedOrder.purchaserEmail}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">User ID: {selectedOrder.userId}</p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Event Details</p>
+                  <p className="text-xs font-semibold text-slate-200">{selectedOrder.eventTitle}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">Event ID: {selectedOrder.eventId}</p>
+                </div>
+              </div>
+
+              {/* Financial Breakdown */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <p className="text-xs text-slate-400">Subtotal</p>
+                  <p className="text-base font-bold text-slate-200 font-mono mt-1">
+                    {formatCurrency(selectedOrder.subtotalMinor ?? selectedOrder.totalMinor ?? 0, selectedOrder.currency)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <p className="text-xs text-slate-400">Discount</p>
+                  <p className="text-base font-bold text-slate-200 font-mono mt-1">
+                    {formatCurrency(selectedOrder.discountMinor ?? 0, selectedOrder.currency)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <p className="text-xs text-slate-400">Total Charged</p>
+                  <p className="text-base font-bold text-emerald-400 font-mono mt-1">
+                    {formatCurrency(selectedOrder.totalMinor ?? 0, selectedOrder.currency)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Associated Tickets */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Issued Tickets ({selectedOrder.tickets?.length ?? 0})
+                </h4>
+                {selectedOrder.tickets && selectedOrder.tickets.length > 0 ? (
+                  <div className="divide-y divide-slate-800/60 border border-slate-800 rounded-xl overflow-hidden">
+                    {selectedOrder.tickets.map((t: any) => (
+                      <div key={t.id} className="p-3 bg-slate-900/40 flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-mono text-purple-300 font-bold">{t.ticketNumber ?? t.id}</p>
+                          <p className="text-[11px] text-slate-400">Status: {t.status}</p>
+                        </div>
+                        <div className="text-right">
+                          {t.checkedInAt ? (
+                            <span className="text-emerald-400 text-[11px] font-mono">
+                              Checked in: {new Date(t.checkedInAt).toLocaleTimeString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">Unscanned</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No ticket items linked to this order record.</p>
+                )}
+              </div>
+
+              {/* Payments Ledger History */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Payment Transactions ({selectedOrder.payments?.length ?? 0})
+                </h4>
+                {selectedOrder.payments && selectedOrder.payments.length > 0 ? (
+                  <div className="divide-y divide-slate-800/60 border border-slate-800 rounded-xl overflow-hidden">
+                    {selectedOrder.payments.map((p: any) => (
+                      <div key={p.id} className="p-3 bg-slate-900/40 flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-mono text-slate-300 font-semibold">{p.provider || 'Gateway'}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">Tx ID: {p.id}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-emerald-400 font-mono">{formatCurrency(p.amountMinor ?? selectedOrder.totalMinor)}</p>
+                          <span className="text-[10px] uppercase font-bold text-slate-400">{p.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No gateway transaction records.</p>
                 )}
               </div>
             </div>
-
-            {/* Financial Breakdown */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                <p className="text-xs text-slate-400">Subtotal</p>
-                <p className="text-base font-bold text-slate-200 font-mono mt-1">
-                  {formatCurrency(orderData.subtotalMinor ?? orderData.totalMinor ?? 0, orderData.currency)}
-                </p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                <p className="text-xs text-slate-400">Discount</p>
-                <p className="text-base font-bold text-slate-200 font-mono mt-1">
-                  {formatCurrency(orderData.discountMinor ?? 0, orderData.currency)}
-                </p>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                <p className="text-xs text-slate-400">Total Charged</p>
-                <p className="text-base font-bold text-emerald-400 font-mono mt-1">
-                  {formatCurrency(orderData.totalMinor ?? 0, orderData.currency)}
-                </p>
-              </div>
-            </div>
-
-            {/* Associated Tickets */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider text-[11px]">
-                Issued Tickets ({orderData.tickets?.length ?? 0})
-              </h4>
-              {orderData.tickets && orderData.tickets.length > 0 ? (
-                <div className="divide-y divide-slate-800/60 border border-slate-800 rounded-xl overflow-hidden">
-                  {orderData.tickets.map((t: any) => (
-                    <div key={t.id} className="p-3 bg-slate-900/40 flex justify-between items-center text-xs">
-                      <div>
-                        <p className="font-mono text-purple-300 font-bold">{t.ticketNumber ?? t.id}</p>
-                        <p className="text-[11px] text-slate-400">Tier: {t.ticketTypeId ?? 'Standard'}</p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase">
-                        {t.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">No ticket items linked to this order record.</p>
-              )}
-            </div>
           </div>
         )}
 
-        {/* Refund Modal */}
+        {/* Authoritative Refund Modal */}
         {showRefundModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="glass-panel p-6 rounded-2xl border border-red-900/50 max-w-md w-full space-y-4 shadow-2xl">
               <h3 className="text-base font-bold text-red-400">Issue Authoritative Refund</h3>
               <p className="text-xs text-slate-300">
-                Processing refund for Order <strong className="text-white font-mono">{orderData?.id}</strong>. The server will calculate the exact refundable amount.
+                Processing refund for Order <strong className="text-white font-mono">{selectedOrder?.id}</strong>. The server will calculate and balance all general ledger journal entries.
               </p>
 
               {refundError && (
@@ -219,7 +439,7 @@ export default function AdminOrdersPage() {
 
               <form onSubmit={handleRefundSubmit} className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Idempotency Key (Generated)</label>
+                  <label className="text-xs text-slate-400 block mb-1">Idempotency Key (Auto-Generated)</label>
                   <input
                     type="text"
                     readOnly
