@@ -1,13 +1,9 @@
-// =============================================================================
-// promoter-web — Promoter Management Layout Shell
-// Displays authenticated promoter affiliate organization, user profile, and responsive drawer navigation.
-// =============================================================================
 'use client';
 
-import React from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@platform/auth';
-import { DashboardLayout as SharedDashboardLayout } from '@platform/ui';
 
 export interface PromoterLayoutProps {
   children: React.ReactNode;
@@ -16,62 +12,130 @@ export interface PromoterLayoutProps {
   actions?: React.ReactNode;
 }
 
-export function PromoterLayout({ children, title, subtitle, actions }: PromoterLayoutProps) {
+const NAV_ITEMS = [
+  { href: '/',          label: 'Overview',  icon: '📊' },
+  { href: '/campaigns', label: 'Campaigns', icon: '🚀' },
+  { href: '/earnings',  label: 'Earnings',  icon: '💰' },
+  { href: '/analytics', label: 'Analytics', icon: '📈' },
+  { href: '/profile',   label: 'Profile',   icon: '👤' },
+];
+
+export function PromoterLayout({ children, title = 'Dashboard', subtitle, actions }: PromoterLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, profile, organizations, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', href: '/', icon: <span>📊</span> },
-    { id: 'campaigns', label: 'Campaigns', href: '/campaigns', icon: <span>🚀</span> },
-    { id: 'earnings', label: 'Earnings Ledger', href: '/earnings', icon: <span>💰</span> },
-    { id: 'analytics', label: 'Analytics', href: '/analytics', icon: <span>📈</span> },
-    { id: 'profile', label: 'Profile', href: '/profile', icon: <span>👤</span> },
-  ];
+  const activeOrg = organizations?.find(o => o.type === 'promoter' && o.status === 'active') ?? organizations?.[0];
+  const displayName = profile?.name ?? user?.email?.split('@')[0] ?? 'Promoter';
+  const initial = displayName.charAt(0).toUpperCase();
 
-  const activeOrg = organizations.find((o) => o.type === 'promoter' && o.status === 'active') ?? organizations[0];
+  // Yellow/amber accent for promoter
+  const accentColor = '#FFE500';
+  const accentDim = 'rgba(255,229,0,0.12)';
+  const accentBorder = 'rgba(255,229,0,0.25)';
 
-  const defaultActions = actions || (
-    <span
-      style={{
-        fontSize: '11px',
-        padding: '4px 10px',
-        borderRadius: '9999px',
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-        color: '#10B981',
-        border: '1px solid rgba(16, 185, 129, 0.25)',
-        fontWeight: '600',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-      }}
-    >
-      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }} />
-      Attribution Live
-    </span>
+  const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
+    <div className="dash-sidebar" style={{ height: onClose ? '100vh' : undefined }}>
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="spin-slow" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: accentColor }}>✳</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: '#fff', letterSpacing: '0.06em' }}>
+              {activeOrg?.name?.toUpperCase() ?? 'PROMOTER'}
+            </span>
+          </div>
+          <span style={{ display: 'inline-flex', marginTop: '6px', background: accentDim, color: accentColor, border: `1px solid ${accentBorder}`, borderRadius: '100px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', padding: '2px 8px', textTransform: 'uppercase' }}>Affiliate Hub</span>
+        </div>
+        {onClose && (
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '18px', cursor: 'pointer', padding: '4px' }}>✕</button>
+        )}
+      </div>
+
+      <div style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+        <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-3)', padding: '0 8px', marginBottom: '8px' }}>Navigation</p>
+        {NAV_ITEMS.map(item => {
+          const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 12px', borderRadius: '8px', margin: '1px 0',
+                fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 500,
+                color: isActive ? accentColor : 'var(--text-2)',
+                background: isActive ? accentDim : 'transparent',
+                border: `1px solid ${isActive ? accentBorder : 'transparent'}`,
+                textDecoration: 'none', transition: 'all var(--speed-fast)',
+              }}
+            >
+              <span style={{ width: '28px', height: '28px', borderRadius: '6px', background: isActive ? accentDim : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: '#080808', flexShrink: 0 }}>{initial}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
+          <p style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+        </div>
+        <button type="button" onClick={() => logout()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '14px', padding: '4px', flexShrink: 0 }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = accentColor; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}>↩</button>
+      </div>
+    </div>
   );
 
   return (
-    <SharedDashboardLayout
-      appName="PromoterHub"
-      appBadge="AFFILIATE"
-      appBadgeColor="accent"
-      navItems={navItems}
-      currentPath={pathname || '/'}
-      onNavigate={(href) => router.push(href)}
-      title={title ?? 'Promoter Console'}
-      subtitle={subtitle}
-      actions={defaultActions}
-      user={{
-        name: profile?.name ?? user?.email?.split('@')[0] ?? 'Promoter',
-        email: user?.email,
-        role: 'Affiliate Partner',
-      }}
-      organizationName={activeOrg?.name ?? 'Affiliate Org'}
-      organizationType={activeOrg?.type ?? 'PROMOTER'}
-      onLogout={() => logout()}
-    >
-      {children}
-    </SharedDashboardLayout>
+    <div className="dash-shell">
+      <div style={{ display: 'none' }} className="dash-sidebar-desktop"><SidebarContent /></div>
+      {mobileOpen && (
+        <div className="dash-sidebar-overlay open" onClick={() => setMobileOpen(false)}>
+          <div className="dash-sidebar-mobile open" onClick={e => e.stopPropagation()}>
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
+      <div className="dash-main">
+        <div className="dash-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button type="button" onClick={() => setMobileOpen(true)} className="dash-hamburger" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '12px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+            </button>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-2)', letterSpacing: '0.06em' }}>PROMOTER</span>
+            <span style={{ color: 'var(--text-3)', fontSize: '16px' }}>/</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-1)', letterSpacing: '0.06em' }}>{title.toUpperCase()}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: accentColor, fontFamily: 'var(--font-mono)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: accentColor, display: 'inline-block' }} />
+              LIVE
+            </div>
+            {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{actions}</div>}
+            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px', color: '#080808' }}>{initial}</div>
+          </div>
+        </div>
+        <div className="dash-content">
+          <div className="dash-page-header">
+            <div>
+              <h1 className="dash-page-title">{title.toUpperCase()}</h1>
+              {subtitle && <p className="dash-page-subtitle">{subtitle}</p>}
+            </div>
+            {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{actions}</div>}
+          </div>
+          {children}
+        </div>
+      </div>
+      <style>{`
+        @media (min-width: 768px) { .dash-sidebar-desktop { display: flex !important; } .dash-hamburger { display: none !important; } }
+        @media (max-width: 767px) { .dash-sidebar-desktop { display: none !important; } }
+      `}</style>
+    </div>
   );
 }

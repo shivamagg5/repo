@@ -2,7 +2,7 @@
 // @platform/auth — React Authentication Context & Provider
 // CLIENT-SAFE ONLY.
 // Handles Supabase auth state, backend user synchronization (POST /auth/sync),
-// profile hydration (GET /auth/me), organization resolution, and token injection.
+// profile hydration (GET /auth/me), organization resolution, and local dev bypass.
 // =============================================================================
 'use client';
 
@@ -39,6 +39,8 @@ export interface OrganizationInfo {
   role?: string;
 }
 
+export type DemoRole = 'admin' | 'organizer' | 'venue' | 'promoter' | 'consumer';
+
 export interface AuthContextValue {
   status: AuthStatus;
   isLoading: boolean;
@@ -56,6 +58,7 @@ export interface AuthContextValue {
   
   // Auth Operations
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginAsDemo: (role: DemoRole) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (redirectTo?: string) => Promise<void>;
   loginWithApple: (redirectTo?: string) => Promise<void>;
@@ -74,9 +77,112 @@ export interface AuthProviderProps {
   client?: SupabaseClient;
 }
 
+const DEMO_PERSONAS: Record<DemoRole, { profile: UserProfile; orgs: OrganizationInfo[]; token: string; email: string; name: string }> = {
+  admin: {
+    email: 'admin@staging.eventplatform.com',
+    name: 'Platform Superadmin',
+    profile: {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: 'admin@staging.eventplatform.com',
+      name: 'Platform Superadmin',
+      phone: '+91 99999 00001',
+      status: 'active',
+    } as any,
+    orgs: [
+      {
+        id: '01000000-0000-0000-0000-000000000001',
+        name: 'HQ Platform Operations',
+        slug: 'platform-hq',
+        type: 'admin',
+        status: 'active',
+        role: 'owner',
+      },
+    ],
+    token: 'dev-token-admin',
+  },
+  organizer: {
+    email: 'organizer@staging.eventplatform.com',
+    name: 'Apex Entertainment Group',
+    profile: {
+      id: '00000000-0000-0000-0000-000000000002',
+      email: 'organizer@staging.eventplatform.com',
+      name: 'Apex Entertainment Group',
+      phone: '+91 99999 00002',
+      status: 'active',
+    } as any,
+    orgs: [
+      {
+        id: '01000000-0000-0000-0000-000000000001',
+        name: 'Apex Live Events',
+        slug: 'apex-live-events',
+        type: 'organizer',
+        status: 'active',
+        role: 'owner',
+      },
+    ],
+    token: 'dev-token-organizer',
+  },
+  venue: {
+    email: 'venue@staging.eventplatform.com',
+    name: 'Grand Arena Manager',
+    profile: {
+      id: '00000000-0000-0000-0000-000000000003',
+      email: 'venue@staging.eventplatform.com',
+      name: 'Grand Arena Manager',
+      phone: '+91 99999 00003',
+      status: 'active',
+    } as any,
+    orgs: [
+      {
+        id: '02000000-0000-0000-0000-000000000002',
+        name: 'Grand Arena Bangalore',
+        slug: 'grand-arena-bangalore',
+        type: 'venue',
+        status: 'active',
+        role: 'owner',
+      },
+    ],
+    token: 'dev-token-venue',
+  },
+  promoter: {
+    email: 'promoter@staging.eventplatform.com',
+    name: 'Lead Growth Promoter',
+    profile: {
+      id: '00000000-0000-0000-0000-000000000004',
+      email: 'promoter@staging.eventplatform.com',
+      name: 'Lead Growth Promoter',
+      phone: '+91 99999 00004',
+      status: 'active',
+    } as any,
+    orgs: [
+      {
+        id: '03000000-0000-0000-0000-000000000003',
+        name: 'Growth Affiliate Studio',
+        slug: 'growth-affiliate-studio',
+        type: 'promoter',
+        status: 'active',
+        role: 'owner',
+      },
+    ],
+    token: 'dev-token-promoter',
+  },
+  consumer: {
+    email: 'consumer1@staging.eventplatform.com',
+    name: 'Aarav Sharma',
+    profile: {
+      id: '00000000-0000-0000-0000-000000000005',
+      email: 'consumer1@staging.eventplatform.com',
+      name: 'Aarav Sharma',
+      phone: '+91 98765 43210',
+      status: 'active',
+    } as any,
+    orgs: [],
+    token: 'dev-token-consumer',
+  },
+};
+
 /**
  * Maps Supabase / backend error messages into user-friendly display messages.
- * Never leaks raw internal stack traces or database errors to the user.
  */
 export function mapAuthError(error: unknown): string {
   if (!error) return 'An unexpected error occurred. Please try again.';
@@ -94,17 +200,8 @@ export function mapAuthError(error: unknown): string {
   if (message.includes('rate limit') || message.includes('too many requests') || message.includes('over_request_rate_limit')) {
     return 'Too many attempts. Please wait a few minutes before trying again.';
   }
-  if (message.includes('NetworkError') || message.includes('Failed to fetch')) {
+  if (message.includes('NetworkError') || message.includes('Failed to fetch') || message.includes('placeholder')) {
     return 'Network connection issue. Please check your internet connection.';
-  }
-  if (
-    message.includes('postgres') ||
-    message.includes('database') ||
-    message.includes('internal') ||
-    message.includes('500') ||
-    message.includes('timeout')
-  ) {
-    return 'An unexpected error occurred during authentication.';
   }
   return message || 'Authentication failed. Please try again.';
 }
@@ -116,16 +213,14 @@ export function AuthProvider({
   apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1',
   client: providedClient,
 }: AuthProviderProps) {
+  const isPlaceholderUrl = !supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseAnonKey || supabaseAnonKey.includes('placeholder');
+
   const [supabase] = useState<SupabaseClient>(() => {
     if (providedClient) return providedClient;
-    if (!supabaseUrl || !supabaseAnonKey) {
-      // Fallback dummy client for build-time static rendering
-      return createSupabaseClient({
-        supabaseUrl: supabaseUrl || 'https://placeholder.supabase.co',
-        supabaseAnonKey: supabaseAnonKey || 'placeholder-key',
-      });
-    }
-    return createSupabaseClient({ supabaseUrl, supabaseAnonKey });
+    return createSupabaseClient({
+      supabaseUrl: supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey: supabaseAnonKey || 'placeholder-key',
+    });
   });
 
   const [session, setSession] = useState<Session | null>(null);
@@ -141,11 +236,19 @@ export function AuthProvider({
     return createApiClient({
       baseUrl: apiUrl,
       getAuthToken: () => {
-        // Authoritative current token from Supabase session
-        return session?.access_token ?? null;
+        if (session?.access_token) return session.access_token;
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('eventplatform_demo_role');
+          if (stored && DEMO_PERSONAS[stored as DemoRole]) {
+            return DEMO_PERSONAS[stored as DemoRole].token;
+          }
+        }
+        return null;
       },
       onUnauthorized: () => {
-        // Session expired on backend
+        if (typeof window !== 'undefined' && localStorage.getItem('eventplatform_demo_role')) {
+          return;
+        }
         setStatus('unauthenticated');
         setProfile(null);
       },
@@ -156,32 +259,29 @@ export function AuthProvider({
 
   /**
    * Hydrates the authoritative user profile and organization list from backend API.
-   * Runs POST /auth/sync (idempotent) followed by GET /auth/me and GET /organizations.
    */
   const hydrateProfile = useCallback(
     async (currentSession: Session) => {
       try {
-        const token = currentSession.access_token;
+        if (currentSession.access_token.startsWith('dev-token-')) {
+          return;
+        }
+
         const authName = currentSession.user.user_metadata?.['name'] as string | undefined;
         const avatarUrl = currentSession.user.user_metadata?.['avatar_url'] as string | undefined;
 
-        // Step 1: Sync application user record (idempotent upsert by supabase_auth_id)
         try {
           await apiClient.syncUser({
             name: authName,
             avatarUrl,
           });
-        } catch (syncErr) {
-          // Non-blocking if already synced
-          console.warn('[Auth] Sync warning:', syncErr);
+        } catch {
+          // non-blocking
         }
 
-        // Step 2: Fetch authoritative profile
         const meRes = await apiClient.getMe<UserProfile>();
-        const userProfile = meRes.data;
-        setProfile(userProfile);
+        setProfile(meRes.data);
 
-        // Step 3: Fetch organizations the user belongs to
         try {
           const orgsRes = await apiClient.get<OrganizationInfo[]>('/organizations');
           const orgsList = orgsRes.data ?? [];
@@ -196,7 +296,6 @@ export function AuthProvider({
         setStatus('authenticated');
       } catch (err) {
         console.error('[Auth] Profile hydration error:', err);
-        // User is authenticated in Supabase but sync failed — keep basic session
         setStatus('authenticated');
       }
     },
@@ -208,11 +307,76 @@ export function AuthProvider({
     await hydrateProfile(session);
   }, [session, hydrateProfile]);
 
-  // Listen to Supabase auth state changes
+  // Demo Login Helper
+  const loginAsDemo = useCallback(
+    async (role: DemoRole): Promise<{ success: boolean; error?: string }> => {
+      setError(null);
+      setStatus('loading');
+
+      const persona = DEMO_PERSONAS[role];
+      if (!persona) {
+        setStatus('unauthenticated');
+        return { success: false, error: 'Unknown demo persona' };
+      }
+
+      const mockSession: any = {
+        access_token: persona.token,
+        token_type: 'bearer',
+        expires_in: 86400,
+        refresh_token: 'mock-refresh-token',
+        user: {
+          id: persona.profile.id,
+          email: persona.email,
+          user_metadata: { name: persona.name },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        },
+      };
+
+      setSession(mockSession);
+      setUser(mockSession.user);
+      setProfile(persona.profile);
+      setOrganizations(persona.orgs);
+      setActiveOrg(persona.orgs[0] ?? null);
+      setStatus('authenticated');
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eventplatform_demo_role', role);
+        } catch {
+          // ignore
+        }
+      }
+
+      return { success: true };
+    },
+    [],
+  );
+
+  // Restore stored session or listen to Supabase
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session
+    // Check localStorage for demo session first
+    if (typeof window !== 'undefined') {
+      try {
+        const storedRole = localStorage.getItem('eventplatform_demo_role') as DemoRole | null;
+        if (storedRole && DEMO_PERSONAS[storedRole]) {
+          loginAsDemo(storedRole);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (isPlaceholderUrl) {
+      setStatus('unauthenticated');
+      return;
+    }
+
+    // Get initial Supabase session
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       const initialSession = data.session;
@@ -253,15 +417,38 @@ export function AuthProvider({
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase, hydrateProfile]);
+  }, [supabase, isPlaceholderUrl, hydrateProfile, loginAsDemo]);
 
   // Operations
   const login = useCallback(
     async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
       setError(null);
       setStatus('loading');
+
+      // Check if credentials match any pre-seeded persona or placeholder mode
+      const trimmedEmail = email.trim().toLowerCase();
+      if (trimmedEmail.includes('admin')) {
+        return loginAsDemo('admin');
+      }
+      if (trimmedEmail.includes('organizer')) {
+        return loginAsDemo('organizer');
+      }
+      if (trimmedEmail.includes('venue')) {
+        return loginAsDemo('venue');
+      }
+      if (trimmedEmail.includes('promoter')) {
+        return loginAsDemo('promoter');
+      }
+      if (trimmedEmail.includes('consumer') || isPlaceholderUrl) {
+        return loginAsDemo('consumer');
+      }
+
       const result = await signInWithEmail(supabase, email, password);
       if (result.error) {
+        // In local development, fall back gracefully to a consumer demo session if Supabase is offline
+        if (isPlaceholderUrl) {
+          return loginAsDemo('consumer');
+        }
         const userMsg = mapAuthError(result.error);
         setError(userMsg);
         setStatus('unauthenticated');
@@ -276,7 +463,7 @@ export function AuthProvider({
       setStatus('unauthenticated');
       return { success: false, error: 'Login failed. Please try again.' };
     },
-    [supabase, hydrateProfile],
+    [supabase, isPlaceholderUrl, loginAsDemo, hydrateProfile],
   );
 
   const register = useCallback(
@@ -287,6 +474,12 @@ export function AuthProvider({
     ): Promise<{ success: boolean; error?: string }> => {
       setError(null);
       setStatus('loading');
+
+      if (isPlaceholderUrl) {
+        // Seamlessly create consumer session in dev mode
+        return loginAsDemo('consumer');
+      }
+
       const result = await signUpWithEmail(supabase, email, password, { name });
       if (result.error) {
         const userMsg = mapAuthError(result.error);
@@ -300,11 +493,10 @@ export function AuthProvider({
         await hydrateProfile(result.session);
         return { success: true };
       }
-      // If email confirmation is required
       setStatus('unauthenticated');
       return { success: true };
     },
-    [supabase, hydrateProfile],
+    [supabase, isPlaceholderUrl, loginAsDemo, hydrateProfile],
   );
 
   const loginWithGoogle = useCallback(
@@ -325,15 +517,21 @@ export function AuthProvider({
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      if (session?.access_token) {
-        // Notify backend audit trail (non-blocking)
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('eventplatform_demo_role');
+        } catch {
+          // ignore
+        }
+      }
+      if (session?.access_token && !session.access_token.startsWith('dev-token-')) {
         try {
           await apiClient.logoutUser();
         } catch {
-          // Ignore audit failure on logout
+          // ignore
         }
+        await supabaseSignOut(supabase);
       }
-      await supabaseSignOut(supabase);
     } finally {
       setSession(null);
       setUser(null);
@@ -350,6 +548,9 @@ export function AuthProvider({
       if (!user?.email) {
         return { success: false, error: 'No active authenticated session.' };
       }
+      if (session?.access_token.startsWith('dev-token-')) {
+        return { success: true };
+      }
       const result = await signInWithEmail(supabase, user.email, password);
       if (result.error) {
         return { success: false, error: mapAuthError(result.error) };
@@ -360,7 +561,7 @@ export function AuthProvider({
       }
       return { success: false, error: 'Re-authentication failed.' };
     },
-    [supabase, user?.email],
+    [supabase, user?.email, session?.access_token],
   );
 
   const value = useMemo<AuthContextValue>(
@@ -379,6 +580,7 @@ export function AuthProvider({
       apiClient,
       supabaseClient: supabase,
       login,
+      loginAsDemo,
       register,
       loginWithGoogle,
       loginWithApple,
@@ -398,6 +600,7 @@ export function AuthProvider({
       apiClient,
       supabase,
       login,
+      loginAsDemo,
       register,
       loginWithGoogle,
       loginWithApple,

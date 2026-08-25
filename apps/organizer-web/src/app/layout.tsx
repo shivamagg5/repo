@@ -1,21 +1,25 @@
-// =============================================================================
-// organizer-web — Root Layout
-// Wrapped with AuthProvider and RoleGuard.
-// =============================================================================
 import type { Metadata } from 'next';
 import { AuthProvider } from '@platform/auth';
 import { RoleGuard } from '../components/RoleGuard';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Organizer Dashboard | EventPlatform',
-  description: 'EventPlatform Organizer Dashboard — Manage events, sales, and admissions',
+  title: 'Organizer Console | EventPlatform',
+  description: 'EventPlatform Organizer Console — Create events, manage sales, and track revenue',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-[#0F1117] text-white antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
         <AuthProvider>
           <RoleGuard>
             {children}

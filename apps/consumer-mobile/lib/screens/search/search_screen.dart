@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/city_provider.dart';
 import '../../theme/app_colors.dart';
@@ -58,9 +59,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _error = null;
     });
 
+    final selectedCity = ref.read(selectedCityProvider);
+
+    // 1. Fast HTTP API call (4s timeout)
     try {
       final apiService = ref.read(apiServiceProvider);
-      final selectedCity = ref.read(selectedCityProvider);
       final params = <String, String>{
         'limit': '30',
         'sort': _sort,
@@ -70,7 +73,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         'datePreset': ?_datePreset,
       };
       final uri = Uri.parse('${apiService.baseUrl}/public/events').replace(queryParameters: params);
-      final res = await http.get(uri, headers: {'Accept': 'application/json'});
+      final res = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final decoded = jsonDecode(res.body);
@@ -85,17 +88,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           _results = list.cast<Map<String, dynamic>>();
           _isLoading = false;
         });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _error = 'Failed to load events';
-          _isLoading = false;
-        });
+        return;
       }
+    } catch (_) {
+      // Fall through to direct Supabase query
+    }
+
+    // 2. Direct Supabase Query (< 50ms fallback)
+    try {
+      final supabase = Supabase.instance.client;
+      var query = supabase
+          .from('events')
+          .select('*, venues(*), ticket_types(*)')
+          .eq('status', 'published');
+
+      if (_query.isNotEmpty) {
+        query = query.ilike('title', '%$_query%');
+      }
+      if (_category != null && _category!.isNotEmpty && _category != 'All') {
+        query = query.eq('category', _category!);
+      }
+
+      final res = await query.order('start_time').limit(30).timeout(const Duration(seconds: 4));
+
+      final items = (res as List).map((row) {
+        final map = Map<String, dynamic>.from(row as Map);
+        map['venue'] = map['venues'];
+        map['ticketTypes'] = map['ticket_types'];
+        map['startDate'] = map['start_time'];
+        map['endDate'] = map['end_time'];
+        map['heroImage'] = map['hero_image_url'] ?? map['hero_image'];
+        return map;
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _results = items;
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not connect to server';
+        _error = 'Could not load search results';
         _isLoading = false;
       });
     }
@@ -103,7 +137,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
+    _debounce = Timer(const Duration(milliseconds: 300), () {
       setState(() => _query = value.trim());
       _fetchEvents();
     });

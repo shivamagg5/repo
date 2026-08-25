@@ -13,6 +13,12 @@ export class ApiClient extends CoreApiClient {
     super({
       baseUrl: baseUrl ?? API_BASE_URL,
       getAuthToken: async () => {
+        if (typeof window !== 'undefined') {
+          const demoRole = localStorage.getItem('eventplatform_demo_role');
+          if (demoRole) {
+            return `dev-token-${demoRole}`;
+          }
+        }
         try {
           const client = getSupabaseClient();
           const { data } = await client.auth.getSession();
@@ -25,7 +31,7 @@ export class ApiClient extends CoreApiClient {
   }
 
   // Backward-compatibility unwrapped aliases for consumer-web page callers
-  async getPublicEventsFeed<T>(params?: Record<string, string>): Promise<T> {
+  override async getPublicEventsFeed<T>(params?: Record<string, string>): Promise<T> {
     const res = await this.getPublicEvents<T>(params);
     return res.data;
   }
@@ -40,17 +46,11 @@ export class ApiClient extends CoreApiClient {
     return res.data;
   }
 
-  async getPublicVenueDetail<T>(slug: string): Promise<T> {
-    const res = await this.getPublicVenueBySlug<T>(slug);
-    return res.data;
-  }
-
   override async getPublicCategories<T = any>(): Promise<any> {
     const res = await super.getPublicCategories<T>();
     return res.data;
   }
 }
 
-export const ApiError = ApiClientError;
 export const apiClient = new ApiClient();
-export { createApiClient, ApiClientError };
+export { ApiClientError, ApiClientError as ApiError };

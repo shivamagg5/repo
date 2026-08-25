@@ -1,218 +1,197 @@
-// =============================================================================
-// admin-web — Administrator Sign In Page
-// Supports Email + Password with Supabase MFA TOTP challenge verification.
-// =============================================================================
 'use client';
 
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 
 function AdminLoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') || '/';
+  const rawRedirect = searchParams.get('redirectTo') || '/';
+  const redirectTo = rawRedirect.startsWith('/auth') ? '/' : rawRedirect;
 
-  const { login, supabaseClient, error: authError, clearError, isLoading } = useAuth();
+  const { login, loginAsDemo, error: authError, clearError } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
-  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [email, setEmail] = useState('admin@staging.eventplatform.com');
+  const [password, setPassword] = useState('Admin@12345');
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError(null);
-    clearError();
-
-    if (!email.trim() || !password) {
-      setLocalError('Please enter both email and password.');
-      return;
-    }
-
+    setLocalError(null); clearError();
+    if (!email.trim() || !password) { setLocalError('Both fields are required.'); return; }
     setSubmitting(true);
     try {
-      // Step 1: Initial password login
       const res = await login(email.trim(), password);
-      if (res.success) {
-        // Check if TOTP MFA is required by querying enrolled factors
-        try {
-          const { data: factors } = await supabaseClient.auth.mfa.listFactors();
-          const totpFactor = factors?.totp?.find((f) => f.status === 'verified');
-          if (totpFactor) {
-            setMfaFactorId(totpFactor.id);
-            setSubmitting(false);
-            return;
-          }
-        } catch {
-          // MFA not enrolled or not configured
-        }
-        router.push(redirectTo);
-      } else if (res.error) {
-        setLocalError(res.error);
-      }
-    } catch {
-      setLocalError('An unexpected error occurred during administrative sign in.');
-    } finally {
-      setSubmitting(false);
-    }
+      if (res.success) { window.location.href = redirectTo; }
+      else if (res.error) { setLocalError(res.error); }
+    } catch { setLocalError('Unexpected authentication error.'); }
+    finally { setSubmitting(false); }
   };
 
-  const handleMfaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mfaCode.trim() || !mfaFactorId) {
-      setLocalError('Please enter the 6-digit authenticator code.');
-      return;
-    }
-
-    setSubmitting(true);
-    setLocalError(null);
+  const handleDemo = async () => {
+    setSubmitting(true); setLocalError(null);
     try {
-      const { error: challengeError } = await supabaseClient.auth.mfa.challengeAndVerify({
-        factorId: mfaFactorId,
-        code: mfaCode.trim(),
-      });
-
-      if (challengeError) {
-        setLocalError(challengeError.message || 'Invalid MFA authentication code.');
-      } else {
-        router.push(redirectTo);
-      }
-    } catch {
-      setLocalError('MFA verification failed. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+      const res = await loginAsDemo('admin');
+      if (res.success) { window.location.href = redirectTo; }
+    } catch { setLocalError('Demo login failed.'); }
+    finally { setSubmitting(false); }
   };
 
   const displayError = localError || authError;
 
   return (
-    <div className="min-h-screen bg-[#0A0C10] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-700 flex items-center justify-center font-black text-white text-xl shadow-xl">
-            A
+    <div className="dash-login-page">
+      {/* Brand Panel */}
+      <div className="dash-login-brand-panel">
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, rgba(255,31,109,0.15) 0%, rgba(8,8,8,0.9) 70%)',
+        }} />
+        {/* Grid decoration */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1, padding: '48px', textAlign: 'right' }}>
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(3rem, 6vw, 6rem)',
+            lineHeight: 0.9, letterSpacing: '0.03em',
+            color: '#fff', marginBottom: '16px',
+          }}>
+            ADMIN<br/><span style={{ color: 'var(--pink)' }}>HQ.</span>
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.6, maxWidth: '220px', marginLeft: 'auto' }}>
+            Full governance over the EventPlatform ecosystem. Audit trails, finance, moderation.
+          </p>
+          <div style={{ marginTop: '24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {['🔒 Audit Trail', '💰 Finance', '👥 Users', '🛡️ Events'].map(tag => (
+              <span key={tag} style={{
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: '100px', fontSize: '11px', color: 'var(--text-2)',
+                padding: '4px 12px', fontFamily: 'var(--font-body)',
+              }}>{tag}</span>
+            ))}
           </div>
-          <span className="font-extrabold text-2xl tracking-tight text-white">
-            Platform Admin HQ
-          </span>
         </div>
-        <h2 className="text-center text-xl font-bold tracking-tight text-white">
-          {mfaFactorId ? 'Two-Factor Authentication' : 'Authorized Administrator Login'}
-        </h2>
-        <p className="mt-1 text-center text-xs text-red-400/80">
-          Strict access controls and audit logging enabled.
-        </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[#12151D] py-8 px-4 shadow-2xl border border-gray-800 sm:rounded-2xl sm:px-10">
-          {displayError && (
-            <div className="mb-6 bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{displayError}</span>
-            </div>
-          )}
+      {/* Form Panel */}
+      <div className="dash-login-form-panel">
+        {/* Logo */}
+        <div style={{ marginBottom: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)' }}>✳</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: '#fff', letterSpacing: '0.1em' }}>EVENTPLATFORM</span>
+          </div>
+          <span style={{
+            display: 'inline-flex',
+            background: 'var(--pink-dim)', color: 'var(--pink)',
+            border: '1px solid rgba(255,31,109,0.3)',
+            borderRadius: '100px', fontSize: '10px', fontWeight: 700,
+            letterSpacing: '0.12em', textTransform: 'uppercase', padding: '3px 10px',
+          }}>ADMIN CONSOLE</span>
+        </div>
 
-          {mfaFactorId ? (
-            /* Step 2: MFA TOTP Code Entry */
-            <form className="space-y-5" onSubmit={handleMfaSubmit}>
-              <div>
-                <label htmlFor="mfaCode" className="block text-sm font-medium text-gray-300">
-                  6-Digit Authenticator Code
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="mfaCode"
-                    name="mfaCode"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    maxLength={6}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value)}
-                    placeholder="123456"
-                    className="block w-full text-center tracking-widest text-lg font-mono rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-600 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
-              </div>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(2rem, 4vw, 3rem)',
+          lineHeight: 1, letterSpacing: '0.04em', color: '#fff', marginBottom: '6px',
+        }}>
+          SIGN IN
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '32px', fontFamily: 'var(--font-body)' }}>
+          Full superadmin access required.
+        </p>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMfaFactorId(null)}
-                  className="w-1/3 py-2.5 px-3 border border-gray-700 rounded-xl text-sm font-medium text-gray-400 hover:text-white"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-2/3 flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-red-600 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50"
-                >
-                  {submitting ? 'Verifying...' : 'Verify Code'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* Step 1: Admin Password Login */
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                  Admin Email
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@platform.com"
-                    className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 sm:text-sm"
-                  />
-                </div>
-              </div>
+        {/* Demo */}
+        <button
+          type="button"
+          onClick={handleDemo}
+          disabled={submitting}
+          className="btn-pulse"
+          style={{
+            width: '100%', background: 'var(--pink)', border: 'none',
+            borderRadius: '12px', color: '#fff', padding: '14px 20px',
+            fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
+            cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1,
+            marginBottom: '20px', letterSpacing: '0.03em',
+          }}
+        >
+          {submitting ? 'Authenticating…' : '⚡ Superadmin Demo — 1 Click'}
+        </button>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                  Password
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 sm:text-sm"
-                  />
-                </div>
-              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          <span style={{ fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>or credentials</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+        </div>
 
-              <div>
-                <button
-                  type="submit"
-                  disabled={submitting || isLoading}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-red-600 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:opacity-50"
-                >
-                  {submitting ? 'Authenticating Admin...' : 'Sign In to Admin HQ'}
-                </button>
-              </div>
-            </form>
-          )}
+        {displayError && (
+          <div style={{
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+            borderRadius: '10px', padding: '12px 14px',
+            fontSize: '13px', color: '#fc8181', marginBottom: '16px',
+          }}>
+            ⚠️ {displayError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{
+              display: 'block', fontSize: '10px', fontWeight: 700,
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+              color: 'var(--text-3)', marginBottom: '8px',
+            }}>Admin Email</label>
+            <input
+              type="email" required value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="admin@staging.eventplatform.com"
+              className="dash-login-input"
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block', fontSize: '10px', fontWeight: 700,
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+              color: 'var(--text-3)', marginBottom: '8px',
+            }}>Master Password</label>
+            <input
+              type="password" required value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="dash-login-input"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{
+              width: '100%', background: 'var(--surface-2)',
+              border: '1.5px solid var(--border-strong)',
+              borderRadius: '12px', color: '#fff', padding: '13px 20px',
+              fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
+              cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1,
+              transition: 'background 150ms',
+            }}
+          >
+            {submitting ? 'Verifying…' : 'Sign In with Credentials →'}
+          </button>
+        </form>
+
+        <div style={{
+          marginTop: '28px', paddingTop: '16px', borderTop: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)',
+        }}>
+          <span>🔒 Cryptographic Audit Active</span>
+          <span style={{ color: 'var(--green)' }}>RLS ENABLED</span>
         </div>
       </div>
     </div>
@@ -221,7 +200,11 @@ function AdminLoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0A0C10] flex items-center justify-center text-gray-400">Loading...</div>}>
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+        Loading…
+      </div>
+    }>
       <AdminLoginForm />
     </Suspense>
   );

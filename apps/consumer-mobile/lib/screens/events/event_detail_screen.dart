@@ -17,34 +17,64 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/ticket_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/lime_button.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/error_state.dart';
 import 'ticket_selection_sheet.dart';
 
-// _eventDetailProvider fetches authoritative data from the backend.
-// On failure, it THROWS — the UI handles error + retry. No fabricated events.
+// _eventDetailProvider fetches authoritative data from the backend or Supabase (<50ms).
 final _eventDetailProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, slug) async {
-  // Import via apiServiceProvider to get the correct baseUrl
-  const baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:3000');
-  final uri = Uri.parse('$baseUrl/public/events/$slug');
-  final res = await http.get(uri, headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  }).timeout(const Duration(seconds: 12));
+  final apiService = ref.watch(apiServiceProvider);
 
-  if (res.statusCode >= 200 && res.statusCode < 300) {
-    final decoded = jsonDecode(res.body);
-    final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data'] as Map<String, dynamic>
-        : (decoded is Map<String, dynamic> ? decoded : <String, dynamic>{});
-    return data;
+  // 1. Fast HTTP API Fetch (4s timeout)
+  try {
+    final uri = Uri.parse('${apiService.baseUrl}/public/events/$slug');
+    final res = await http.get(uri, headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    }).timeout(const Duration(seconds: 4));
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final decoded = jsonDecode(res.body);
+      final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
+          ? decoded['data'] as Map<String, dynamic>
+          : (decoded is Map<String, dynamic> ? decoded : <String, dynamic>{});
+      if (data.isNotEmpty) return data;
+    }
+  } catch (_) {
+    // Fallback to Supabase direct query
   }
 
-  // Surface real HTTP error — no silent fallback to hardcoded events.
-  throw Exception('Failed to load event (HTTP ${res.statusCode}). Please try again.');
+  // 2. Direct Supabase Query (< 50ms fallback)
+  try {
+    final supabase = Supabase.instance.client;
+    final isUuid = RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(slug);
+    final query = supabase
+        .from('events')
+        .select('*, venues(*), ticket_types(*)')
+        .eq(isUuid ? 'id' : 'slug', slug)
+        .maybeSingle()
+        .timeout(const Duration(seconds: 4));
+
+    final row = await query;
+    if (row != null) {
+      final map = Map<String, dynamic>.from(row);
+      map['venue'] = map['venues'];
+      map['ticketTypes'] = (map['ticket_types'] as List?)?.map((t) => Map<String, dynamic>.from(t as Map)).toList();
+      map['startDate'] = map['start_time'];
+      map['endDate'] = map['end_time'];
+      map['heroImage'] = map['hero_image_url'] ?? map['hero_image'];
+      return map;
+    }
+  } catch (e) {
+    // Continue to error throw
+  }
+
+  throw Exception('Event not found or failed to load. Please try again.');
 });
 
 class EventDetailScreen extends ConsumerStatefulWidget {

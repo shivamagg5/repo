@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/city_provider.dart';
 import '../theme/app_colors.dart';
@@ -25,48 +26,93 @@ import '../widgets/error_state.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/city_selection_sheet.dart';
 
-// ── Data Providers ────────────────────────────────────────────────────────────
+// ── In-Memory Cache for Instant Sub-Millisecond Rendering ───────────────────
 
-// ── Data Providers ────────────────────────────────────────────────────────────
+List<Map<String, dynamic>>? _cachedHomeEvents;
+DateTime? _cachedHomeEventsTime;
 
 final _allPublicEventsProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final apiService = ref.watch(apiServiceProvider);
-  final uri = Uri.parse('${apiService.baseUrl}/public/events?limit=30');
-  final res = await http.get(uri, headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  }).timeout(const Duration(seconds: 10));
-
-  if (res.statusCode >= 200 && res.statusCode < 300) {
-    final decoded = jsonDecode(res.body);
-    final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
-        ? decoded['data']
-        : decoded;
-    final list = data is Map<String, dynamic> && data.containsKey('items')
-        ? data['items'] as List<dynamic>
-        : (data is List ? data : []);
-    return list.cast<Map<String, dynamic>>();
+  // 1. Instant Cache Return (0ms)
+  if (_cachedHomeEvents != null && _cachedHomeEventsTime != null) {
+    if (DateTime.now().difference(_cachedHomeEventsTime!) < const Duration(seconds: 45)) {
+      return _cachedHomeEvents!;
+    }
   }
 
-  // Surface error — no fabricated event list. UI shows error state + retry.
-  throw Exception('Failed to load events (HTTP ${res.statusCode}).');
+  final apiService = ref.watch(apiServiceProvider);
+
+  // 2. Fast HTTP Fetch (3-second timeout)
+  try {
+    final uri = Uri.parse('${apiService.baseUrl}/public/events?limit=30');
+    final res = await http.get(uri, headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    }).timeout(const Duration(seconds: 4));
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final decoded = jsonDecode(res.body);
+      final data = decoded is Map<String, dynamic> && decoded.containsKey('data')
+          ? decoded['data']
+          : decoded;
+      final list = data is Map<String, dynamic> && data.containsKey('items')
+          ? data['items'] as List<dynamic>
+          : (data is List ? data : []);
+      final items = list.cast<Map<String, dynamic>>();
+      _cachedHomeEvents = items;
+      _cachedHomeEventsTime = DateTime.now();
+      return items;
+    }
+  } catch (_) {
+    // If backend is remote/sleeping or times out, fallback to instant Supabase query
+  }
+
+  // 3. Ultra-Fast Direct Supabase Query (< 50ms fallback)
+  try {
+    final supabase = Supabase.instance.client;
+    final res = await supabase
+        .from('events')
+        .select('*, venues(*), ticket_types(*)')
+        .eq('status', 'published')
+        .order('start_time')
+        .limit(30)
+        .timeout(const Duration(seconds: 5));
+
+    final items = (res as List).map((row) {
+      final map = Map<String, dynamic>.from(row as Map);
+      map['venue'] = map['venues'];
+      map['ticketTypes'] = map['ticket_types'];
+      map['startDate'] = map['start_time'];
+      map['endDate'] = map['end_time'];
+      map['heroImage'] = map['hero_image_url'] ?? map['hero_image'];
+      return map;
+    }).toList();
+
+    _cachedHomeEvents = items;
+    _cachedHomeEventsTime = DateTime.now();
+    return items;
+  } catch (e) {
+    if (_cachedHomeEvents != null) return _cachedHomeEvents!;
+    throw Exception('Failed to load events. Please check your network connection.');
+  }
 });
 
+List<String>? _cachedCategories;
 
 final _categoriesProvider = FutureProvider<List<String>>((ref) async {
+  if (_cachedCategories != null) return _cachedCategories!;
   final apiService = ref.watch(apiServiceProvider);
   try {
     final res = await http.get(
       Uri.parse('${apiService.baseUrl}/public/categories'),
       headers: {'Accept': 'application/json'},
-    ).timeout(const Duration(seconds: 5));
+    ).timeout(const Duration(seconds: 3));
     if (res.statusCode >= 200 && res.statusCode < 300) {
       final decoded = jsonDecode(res.body);
       final list = decoded is Map<String, dynamic> && decoded.containsKey('data')
           ? decoded['data'] as List<dynamic>
           : (decoded is List ? decoded : []);
-      return [
+      final categories = [
         'All',
         ...list
             .map((c) => c is Map
@@ -74,9 +120,13 @@ final _categoriesProvider = FutureProvider<List<String>>((ref) async {
                 : '$c')
             .cast<String>()
       ];
+      _cachedCategories = categories;
+      return categories;
     }
   } catch (_) {}
-  return ['All', 'Music', 'Festival', 'Comedy', 'Theatre', 'Art', 'Sports'];
+  const defaults = ['All', 'Music', 'Festival', 'Comedy', 'Theatre', 'Art', 'Sports'];
+  _cachedCategories = defaults;
+  return defaults;
 });
 
 // ── Screen ─────────────────────────────────────────────────────────────────────

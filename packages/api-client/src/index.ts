@@ -152,6 +152,11 @@ export class ApiClient {
     return this.get<T>('/public/events', params);
   }
 
+  async getPublicEventsFeed<T>(params?: Record<string, string>): Promise<T> {
+    const res = await this.get<T>('/public/events', params);
+    return res.data;
+  }
+
   async getPublicEventBySlug<T>(slug: string): Promise<ApiSuccess<T>> {
     return this.get<T>(`/public/events/${encodeURIComponent(slug)}`);
   }

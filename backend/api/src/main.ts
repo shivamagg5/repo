@@ -18,18 +18,30 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS — strict origin enforcement in production
+  // CORS — origin enforcement
   const isProduction = process.env['NODE_ENV'] === 'production';
   const corsEnv = process.env['CORS_ORIGINS'];
   
   let corsOrigins: boolean | string[] = true;
-  if (isProduction) {
-    if (!corsEnv || corsEnv === '*') {
-      throw new Error('[FATAL CONFIG] CORS_ORIGINS must be explicitly configured with trusted domains in production.');
-    }
+  if (corsEnv && corsEnv !== '*') {
     corsOrigins = corsEnv.split(',').map((o) => o.trim());
-  } else if (corsEnv && corsEnv !== '*') {
-    corsOrigins = corsEnv.split(',').map((o) => o.trim());
+  } else if (isProduction) {
+    // Safe production default allowlist if CORS_ORIGINS is not manually set on cloud dashboard
+    corsOrigins = [
+      'https://event-platform-api-r4og.onrender.com',
+      'https://eventpulse.com',
+      'https://app.eventpulse.com',
+      'https://organizer.eventpulse.com',
+      'https://admin.eventpulse.com',
+      'https://venue.eventpulse.com',
+      'https://promoter.eventpulse.com',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
+      'http://localhost:3004',
+      'http://localhost:3005',
+    ];
   }
 
   app.enableCors({

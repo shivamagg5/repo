@@ -1,14 +1,9 @@
-// =============================================================================
-// admin-web — Enterprise Admin Layout Shell
-// High-density Command Center with mobile drawer navigation, security indicators, and audit trails.
-// =============================================================================
 'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@platform/auth';
-import { Drawer, IconButton, Badge } from '@platform/ui';
 
 export interface AdminLayoutProps {
   children: React.ReactNode;
@@ -18,146 +13,218 @@ export interface AdminLayoutProps {
 }
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Command Center', icon: '📊' },
-  { href: '/users', label: 'User Governance', icon: '👥' },
-  { href: '/events', label: 'Event Review Queue', icon: '🛡️' },
-  { href: '/orders', label: 'Orders & Refunds', icon: '📦' },
-  { href: '/finance', label: 'Finance & Ledger', icon: '💰' },
-  { href: '/settlements', label: 'Settlements', icon: '⚖️' },
-  { href: '/cms', label: 'CMS & Content', icon: '🎨' },
-  { href: '/audit-logs', label: 'Audit Logs', icon: '📜' },
+  { href: '/',            label: 'Command Center', icon: '📊' },
+  { href: '/users',       label: 'User Governance', icon: '👥' },
+  { href: '/events',      label: 'Event Review',    icon: '🛡️' },
+  { href: '/orders',      label: 'Orders & Refunds', icon: '📦' },
+  { href: '/finance',     label: 'Finance',         icon: '💰' },
+  { href: '/settlements', label: 'Settlements',     icon: '⚖️' },
+  { href: '/cms',         label: 'CMS',             icon: '🎨' },
+  { href: '/audit-logs',  label: 'Audit Logs',      icon: '📜' },
 ];
 
 export function AdminLayout({ children, title, subtitle, actions }: AdminLayoutProps) {
   const pathname = usePathname();
   const { user, profile, logout } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const userInitial = profile?.name ? profile.name.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() ?? 'A');
+  const displayName = profile?.name ?? user?.email?.split('@')[0] ?? 'Admin';
+  const initial = displayName.charAt(0).toUpperCase();
 
-  const navContent = (
-    <div className="flex flex-col justify-between h-full p-4">
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-2 font-mono">
-          Governance Controls
-        </p>
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+  const Sidebar = ({ onClose }: { onClose?: () => void }) => (
+    <div className="dash-sidebar" style={{ height: onClose ? '100vh' : undefined }}>
+      {/* Brand */}
+      <div style={{
+        padding: '20px 16px 16px',
+        borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="spin-slow" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)' }}>✳</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: '#fff', letterSpacing: '0.06em' }}>ADMIN HQ</span>
+          </div>
+          <div style={{
+            display: 'inline-flex', marginTop: '6px',
+            background: 'rgba(255,31,109,0.12)', color: 'var(--pink)',
+            border: '1px solid rgba(255,31,109,0.25)',
+            borderRadius: '100px', fontSize: '9px', fontWeight: 700,
+            letterSpacing: '0.1em', padding: '2px 8px', textTransform: 'uppercase',
+          }}>
+            Platform Governance
+          </div>
+        </div>
+        {onClose && (
+          <button type="button" onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'var(--text-3)',
+            fontSize: '18px', cursor: 'pointer', padding: '4px',
+          }}>✕</button>
+        )}
+      </div>
+
+      {/* Nav */}
+      <div style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+        <p style={{
+          fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em',
+          textTransform: 'uppercase', color: 'var(--text-3)',
+          padding: '0 8px', marginBottom: '8px',
+        }}>Controls</p>
+        {NAV_ITEMS.map(item => {
+          const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                isActive
-                  ? 'bg-red-600/15 border border-red-500/30 text-red-400 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-              }`}
+              onClick={onClose}
+              className={`dash-nav-item${isActive ? ' active' : ''}`}
             >
-              <span className="text-base">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="nav-icon">{item.icon}</span>
+              {item.label}
             </Link>
           );
         })}
       </div>
 
-      {/* Security Policy Reminder */}
-      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-400 space-y-1 mt-6">
-        <p className="font-bold text-slate-300 flex items-center gap-1.5">
-          <span className="text-red-400">🔒</span> Immutable Audit Trail
-        </p>
-        <p className="leading-relaxed">All moderation actions, refunds, and status overrides are logged permanently.</p>
+      {/* User Footer */}
+      <div style={{
+        padding: '12px 14px',
+        borderTop: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', gap: '10px',
+      }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '8px',
+          background: 'var(--pink)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: '#fff',
+          flexShrink: 0,
+        }}>
+          {initial}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {displayName}
+          </p>
+          <p style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {user?.email}
+          </p>
+        </div>
+        <button type="button" onClick={() => logout()} title="Sign out" style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--text-3)', fontSize: '12px', padding: '4px', flexShrink: 0,
+          fontFamily: 'var(--font-body)',
+          transition: 'color 140ms',
+        }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--pink)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
+        >
+          ↩
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-['Inter']">
-      {/* Top Security Banner */}
-      <header className="h-14 border-b border-slate-800/80 bg-[#0B0E17]/95 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="md:hidden">
-            <IconButton
-              variant="ghost"
-              size="sm"
-              label="Toggle navigation drawer"
-              icon={<span>☰</span>}
-              onClick={() => setMobileMenuOpen(true)}
-            />
-          </div>
+    <div className="dash-shell">
+      {/* Desktop Sidebar */}
+      <div style={{ display: 'none' }} className="dash-sidebar-desktop">
+        <Sidebar />
+      </div>
 
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-red-600 to-rose-600 flex items-center justify-center font-bold text-white shadow-lg shadow-red-950/40">
-            ⚡
-          </div>
-          <div>
-            <span className="font-bold text-sm tracking-tight text-white flex items-center gap-2 font-['Outfit']">
-              EVENTPLATFORM <Badge variant="danger" size="sm">HQ Governance</Badge>
-            </span>
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="dash-sidebar-overlay open"
+          onClick={() => setMobileOpen(false)}
+        >
+          <div
+            className="dash-sidebar-mobile open"
+            onClick={e => e.stopPropagation()}
+          >
+            <Sidebar onClose={() => setMobileOpen(false)} />
           </div>
         </div>
+      )}
 
-        {/* Admin Session & Status */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="hidden sm:inline">PROD-PRIMARY</span>
-          </div>
-
-          <div className="h-4 w-px bg-slate-800" />
-
-          {/* User Profile */}
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
-              {userInitial}
-            </div>
-            <div className="hidden md:block text-left text-xs leading-tight">
-              <p className="font-semibold text-slate-200">{profile?.name ?? 'Platform Administrator'}</p>
-              <p className="text-[10px] text-slate-400 font-mono truncate max-w-[140px]">{user?.email}</p>
-            </div>
+      {/* Main Area */}
+      <div className="dash-main">
+        {/* Topbar */}
+        <div className="dash-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Mobile hamburger */}
             <button
               type="button"
-              onClick={() => logout()}
-              title="Sign Out of Admin Console"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-colors text-xs"
+              onClick={() => setMobileOpen(true)}
+              className="dash-hamburger"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-2)', padding: '6px',
+                display: 'flex', flexDirection: 'column', gap: '4px',
+              }}
             >
-              Sign Out
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '12px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
             </button>
+            {/* Breadcrumb */}
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-2)', letterSpacing: '0.06em' }}>
+              ADMIN
+            </span>
+            <span style={{ color: 'var(--text-3)', fontSize: '16px' }}>/</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-1)', letterSpacing: '0.06em' }}>
+              {title.toUpperCase()}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Live badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              fontSize: '11px', color: 'var(--green)',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              <span style={{
+                width: '6px', height: '6px', borderRadius: '50%',
+                background: 'var(--green)', animation: 'pulse 2s ease-in-out infinite',
+                display: 'inline-block',
+              }} />
+              LIVE
+            </div>
+            {/* User avatar */}
+            <div style={{
+              width: '30px', height: '30px', borderRadius: '8px',
+              background: 'var(--pink)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontWeight: 700, fontSize: '12px', color: '#fff',
+            }}>
+              {initial}
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* Main Admin Body with Left Sidebar */}
-      <div className="flex flex-1">
-        {/* Desktop Sidebar */}
-        <aside className="w-64 border-r border-slate-800/80 bg-[#090C14] hidden md:flex flex-col justify-between">
-          {navContent}
-        </aside>
-
-        {/* Mobile Slide-Out Drawer (< 768px) */}
-        <Drawer
-          isOpen={mobileMenuOpen}
-          onClose={() => setMobileMenuOpen(false)}
-          title="Admin Governance"
-          position="left"
-          width="280px"
-        >
-          {navContent}
-        </Drawer>
-
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
-          {/* Header Row */}
-          <div className="flex flex-wrap justify-between items-start mb-6 gap-4">
+        {/* Content */}
+        <div className="dash-content">
+          <div className="dash-page-header">
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-white font-['Outfit']">{title}</h1>
-              {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+              <h1 className="dash-page-title">{title.toUpperCase()}</h1>
+              {subtitle && <p className="dash-page-subtitle">{subtitle}</p>}
             </div>
-            {actions && <div className="flex items-center gap-2">{actions}</div>}
+            {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{actions}</div>}
           </div>
-
           {children}
-        </main>
+        </div>
       </div>
+
+      <style>{`
+        @media (min-width: 768px) {
+          .dash-sidebar-desktop { display: flex !important; }
+          .dash-hamburger { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          .dash-sidebar-desktop { display: none !important; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }

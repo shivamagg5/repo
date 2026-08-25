@@ -2,123 +2,193 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/*
+ * Direct port of lovable-project-f5b99fdf/src/styles.css
+ * Tailwind v3 adaptation: @utility → @layer utilities, @theme → tailwind.config.js
+ */
 
+/* ── CSS CUSTOM PROPERTIES (exact copy from Lovable :root) ── */
 :root {
-  /* --- Brand Colors --- */
-  --color-brand: #7C3AED;
-  --color-brand-strong: #6D28D9;
-  --color-brand-subtle: rgba(124, 58, 237, 0.15);
-  --color-brand-glow: rgba(124, 58, 237, 0.35);
+  --radius: 1rem;
 
-  --color-accent-pink: #EC4899;
-  --color-accent-pink-subtle: rgba(236, 72, 153, 0.15);
-  --color-accent-cyan: #06B6D4;
+  --background: oklch(0.13 0.005 285);
+  --foreground: oklch(0.97 0.005 285);
+  --card: oklch(0.18 0.008 285);
+  --card-foreground: oklch(0.97 0.005 285);
+  --popover: oklch(0.18 0.008 285);
+  --popover-foreground: oklch(0.97 0.005 285);
 
-  /* --- Deep Obsidian Dark Surfaces --- */
-  --color-bg-base: #090C15;
-  --color-bg-surface: #111625;
-  --color-bg-surface-elevated: #182035;
-  --color-bg-surface-hover: #222C46;
-  --color-bg-glass: rgba(17, 22, 37, 0.75);
+  /* hot pink — the loud one */
+  --primary: oklch(0.78 0.19 340);
+  --primary-foreground: oklch(0.15 0.02 340);
 
-  /* Legacy Aliases */
-  --color-background: #090C15;
-  --color-surface: #111625;
-  --color-surface-elevated: #182035;
-  --color-surface-hover: #222C46;
+  --secondary: oklch(0.24 0.01 285);
+  --secondary-foreground: oklch(0.97 0.005 285);
 
-  /* --- Text --- */
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
-  --color-text-inverse: #090C15;
+  --muted: oklch(0.22 0.008 285);
+  --muted-foreground: oklch(0.68 0.01 285);
 
-  /* --- Borders --- */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
-  --color-border-focus: #7C3AED;
+  /* acid green */
+  --accent: oklch(0.87 0.22 145);
+  --accent-foreground: oklch(0.16 0.03 145);
 
-  /* --- Semantic States --- */
-  --color-success: #10B981;
-  --color-success-subtle: rgba(16, 185, 129, 0.12);
-  --color-warning: #F59E0B;
-  --color-warning-subtle: rgba(245, 158, 11, 0.12);
-  --color-danger: #EF4444;
-  --color-danger-subtle: rgba(239, 68, 68, 0.12);
-  --color-info: #3B82F6;
-  --color-info-subtle: rgba(59, 130, 246, 0.12);
+  --neon: oklch(0.85 0.19 195);
+  --neon-foreground: oklch(0.15 0.02 195);
 
-  /* --- Typography --- */
-  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* marquee / ticket orange */
+  --flame: oklch(0.7 0.21 40);
+  --flame-foreground: oklch(0.15 0.02 40);
 
-  /* --- Shadows --- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.65);
-  --shadow-brand: 0 4px 24px rgba(124, 58, 237, 0.35);
+  --destructive: oklch(0.63 0.24 27);
+  --destructive-foreground: oklch(0.98 0 0);
 
-  /* --- Radius --- */
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-pill: 9999px;
+  --border: oklch(0.3 0.01 285);
+  --input: oklch(0.3 0.01 285);
+  --ring: oklch(0.78 0.19 340);
 
-  /* --- Transitions --- */
-  --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --gradient-hot: linear-gradient(100deg, var(--primary), var(--flame));
+  --gradient-acid: linear-gradient(100deg, var(--accent), var(--neon));
+  --glow-pink: 0 0 0 1px color-mix(in oklab, var(--primary) 40%, transparent),
+    0 18px 60px -18px color-mix(in oklab, var(--primary) 70%, transparent);
+  --glow-acid: 0 18px 60px -20px color-mix(in oklab, var(--accent) 65%, transparent);
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
+/* ── BASE (exact copy from Lovable @layer base) ── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 }
 
-html, body {
-  background-color: var(--color-bg-base);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
+/* ── UTILITIES (exact copy from Lovable @utility blocks) ── */
+@layer utilities {
+  .font-display {
+    font-family: 'Anton', 'Arial Narrow', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  .text-stroke {
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--foreground);
+  }
+
+  .bg-hot {
+    background-image: var(--gradient-hot);
+  }
+
+  .bg-acid {
+    background-image: var(--gradient-acid);
+  }
+
+  .glow-pink {
+    box-shadow: var(--glow-pink);
+  }
+
+  .glow-acid {
+    box-shadow: var(--glow-acid);
+  }
+
+  .marquee-track {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: marquee-scroll 26s linear infinite;
+  }
+
+  .spin-slow {
+    animation: spin-slow 14s linear infinite;
+  }
+}
+
+/* ── GRAIN (exact copy from Lovable — uses nested & selector) ── */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--foreground) 55%, transparent) 0.5px,
+    transparent 0.5px
+  );
+  background-size: 3px 3px;
+  mix-blend-mode: overlay;
+}
+
+/* ── KEYFRAMES (exact copy from Lovable) ── */
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+/* ── TAILWIND COLOR BRIDGE ──
+   Tailwind v3 reads these as `bg-background`, `text-foreground`, etc.
+   via the CSS variable strategy in tailwind.config.js
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── DASHBOARD STYLES (preserved for other app pages) ── */
+.dash-login-page {
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--background);
 }
-
-a {
-  color: inherit;
-  text-decoration: none;
+@media (min-width: 900px) {
+  .dash-login-page { grid-template-columns: 1fr 1fr; }
 }
-
-/* Glassmorphism Surface Utility */
-.glass-surface {
-  background: var(--color-bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border);
+.dash-login-brand-panel {
+  display: none;
+  position: relative;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 60px 56px;
+  align-items: flex-end;
+  justify-content: flex-start;
+  overflow: hidden;
+  min-height: 100vh;
 }
-
-.glass-surface-hover:hover {
-  background: rgba(24, 32, 53, 0.88);
-  border-color: var(--color-border-strong);
-  transform: translateY(-2px);
-  transition: all var(--transition-fast);
+@media (min-width: 900px) { .dash-login-brand-panel { display: flex; } }
+.dash-login-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 40px;
+  min-height: 100vh;
 }
-
-/* Hero Gradient Overlay */
-.hero-gradient {
-  background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.28) 0%, rgba(9, 12, 21, 0) 70%),
-              linear-gradient(180deg, rgba(9, 12, 21, 0.3) 0%, var(--color-bg-base) 100%);
+@media (min-width: 900px) { .dash-login-form-panel { padding: 60px 64px; } }
+.dash-login-input {
+  width: 100%;
+  background: var(--muted);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color 150ms;
 }
-
-.text-gradient {
-  background: linear-gradient(135deg, #FFFFFF 0%, #C4B5FD 50%, #EC4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.focus-ring:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
+.dash-login-input::placeholder { color: var(--muted-foreground); }

@@ -1,202 +1,244 @@
-// =============================================================================
-// consumer-web — Sign In Page
-// Supports Email + Password, Google OAuth, and Apple OAuth.
-// Pure client-safe Supabase auth flow.
-// =============================================================================
 'use client';
 
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') || '/';
+  const rawRedirect = searchParams.get('redirectTo') || '/';
+  const redirectTo = rawRedirect.startsWith('/auth') ? '/' : rawRedirect;
 
-  const { login, loginWithGoogle, loginWithApple, error: authError, clearError, isLoading } = useAuth();
+  const { login, loginAsDemo, loginWithGoogle, loginWithApple, error: authError, clearError } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('consumer1@staging.eventplatform.com');
+  const [password, setPassword] = useState('Consumer@12345');
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError(null);
-    clearError();
-
-    if (!email.trim() || !password) {
-      setLocalError('Please enter both email and password.');
-      return;
-    }
-
+    setLocalError(null); clearError();
+    if (!email.trim() || !password) { setLocalError('Please fill in both fields.'); return; }
     setSubmitting(true);
     try {
       const res = await login(email.trim(), password);
-      if (res.success) {
-        router.push(redirectTo);
-      } else if (res.error) {
-        setLocalError(res.error);
-      }
-    } catch {
-      setLocalError('An unexpected error occurred during sign in. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+      if (res.success) { window.location.href = redirectTo; }
+      else if (res.error) { setLocalError(res.error); }
+    } catch { setLocalError('Unexpected error. Try again.'); }
+    finally { setSubmitting(false); }
   };
 
-  const handleOAuth = async (provider: 'google' | 'apple') => {
-    setLocalError(null);
-    clearError();
+  const handleDemo = async () => {
+    setSubmitting(true); setLocalError(null);
     try {
-      if (provider === 'google') {
-        await loginWithGoogle();
-      } else {
-        await loginWithApple();
-      }
-    } catch {
-      setLocalError(`Failed to initialize ${provider} sign in.`);
-    }
+      const res = await loginAsDemo('consumer');
+      if (res.success) { window.location.href = redirectTo; }
+    } catch { setLocalError('Demo login failed.'); }
+    finally { setSubmitting(false); }
   };
 
   const displayError = localError || authError;
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary,#0F1117)] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand */}
-        <Link href="/" className="flex items-center justify-center gap-2 group mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white text-xl shadow-lg">
-            E
-          </div>
-          <span className="font-extrabold text-2xl tracking-tight text-white">
-            EventPlatform
-          </span>
-        </Link>
-        <h2 className="text-center text-2xl font-bold tracking-tight text-white">
-          Welcome back
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-400">
-          Don&apos;t have an account?{' '}
-          <Link
-            href={`/auth/register${redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
-            className="font-medium text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            Sign up for free
-          </Link>
-        </p>
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      background: 'var(--black)',
+    }}>
+      {/* Left panel — branding */}
+      <div style={{
+        flex: 1, display: 'none', position: 'relative',
+        background: 'var(--surface-1)',
+        borderRight: '1px solid var(--border)',
+        overflow: 'hidden', alignItems: 'flex-end', padding: '48px',
+      }} className="login-left-panel">
+        {/* BG gradient */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, rgba(255,31,109,0.2) 0%, rgba(8,8,8,0.8) 60%)',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(2.5rem, 5vw, 5rem)',
+            lineHeight: 0.92, letterSpacing: '0.03em',
+            color: '#fff', marginBottom: '20px',
+          }}>
+            LIVE.<br/>LOUD.<br/><span style={{ color: 'var(--pink)' }}>LEGENDARY.</span>
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-2)', fontFamily: 'var(--font-body)', lineHeight: 1.6, maxWidth: '280px' }}>
+            Book tickets to the best live events in India. No bots. No fakes. Just real nights.
+          </p>
+        </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[var(--color-bg-secondary,#161922)] py-8 px-4 shadow-2xl border border-gray-800 sm:rounded-2xl sm:px-10">
+      {/* Right panel — form */}
+      <div style={{
+        width: '100%', maxWidth: '480px', minHeight: '100vh',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 32px',
+        background: 'var(--black)',
+      }}>
+        {/* Logo */}
+        <Link href="/" style={{ textDecoration: 'none', marginBottom: '40px', alignSelf: 'flex-start' }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)', marginRight: '8px' }}>✳</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: '#fff', letterSpacing: '0.1em' }}>EVENTPLATFORM</span>
+        </Link>
+
+        <div style={{ width: '100%' }}>
+          <h1 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(2rem, 5vw, 3rem)',
+            lineHeight: 1, letterSpacing: '0.04em',
+            color: '#fff', marginBottom: '6px',
+          }}>
+            WELCOME BACK
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-2)', marginBottom: '32px', fontFamily: 'var(--font-body)' }}>
+            Sign in to manage your tickets and more.
+          </p>
+
+          {/* Demo button */}
+          <button
+            type="button"
+            onClick={handleDemo}
+            disabled={submitting}
+            className="btn-demo-pulse"
+            style={{
+              width: '100%',
+              background: 'var(--pink)',
+              border: 'none', borderRadius: '12px',
+              color: '#fff', padding: '14px 20px',
+              fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.7 : 1,
+              marginBottom: '20px',
+              letterSpacing: '0.03em',
+            }}
+          >
+            {submitting ? 'Loading…' : '🚀 Try Demo — 1 Click Access'}
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+            <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-body)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>or sign in</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          </div>
+
+          {/* Error */}
           {displayError && (
-            <div className="mb-6 bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{displayError}</span>
+            <div style={{
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '10px', padding: '12px 14px',
+              fontSize: '13px', color: '#fc8181', marginBottom: '16px',
+              fontFamily: 'var(--font-body)',
+            }}>
+              ⚠️ {displayError}
             </div>
           )}
 
-          {/* Social Logins */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              type="button"
-              onClick={() => handleOAuth('google')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-700 rounded-xl shadow-sm text-sm font-medium text-gray-200 bg-gray-900/60 hover:bg-gray-800 transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-              </svg>
-              Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOAuth('apple')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-700 rounded-xl shadow-sm text-sm font-medium text-gray-200 bg-gray-900/60 hover:bg-gray-800 transition-colors"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.85c.66-.8 1.11-1.92.99-3.04-.96.04-2.12.64-2.8 1.44-.6.69-1.12 1.83-.98 2.92 1.07.08 2.13-.52 2.79-1.32z"/>
-              </svg>
-              Apple
-            </button>
-          </div>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-800" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[var(--color-bg-secondary,#161922)] px-2 text-gray-400">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          {/* Email/Password Form */}
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Email address
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '8px', fontFamily: 'var(--font-body)' }}>
+                Email
               </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:text-sm transition-colors"
-                />
-              </div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="login-input"
+              />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '8px', fontFamily: 'var(--font-body)' }}>
                 Password
               </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:text-sm transition-colors"
-                />
-              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="login-input"
+              />
             </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={submitting || isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Signing in...' : 'Sign in'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                width: '100%',
+                background: 'var(--surface-2)',
+                border: '1.5px solid var(--border-strong)',
+                borderRadius: '12px', color: '#fff',
+                padding: '13px 20px',
+                fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.7 : 1,
+                transition: 'background 150ms, border-color 150ms',
+                letterSpacing: '0.03em',
+              }}
+            >
+              {submitting ? 'Signing in…' : 'Sign In →'}
+            </button>
           </form>
+
+          {/* Social */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
+            {[
+              { icon: 'G', label: 'Google', provider: 'google' as const },
+              { icon: '🍎', label: 'Apple', provider: 'apple' as const },
+            ].map(s => (
+              <button
+                key={s.provider}
+                type="button"
+                onClick={async () => { try { s.provider === 'google' ? await loginWithGoogle() : await loginWithApple(); } catch { setLocalError(`${s.label} login failed.`); } }}
+                style={{
+                  background: 'var(--surface-1)', border: '1px solid var(--border)',
+                  borderRadius: '10px', padding: '11px',
+                  fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 600,
+                  color: 'var(--text-2)', cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  transition: 'border-color 150ms, color 150ms',
+                }}
+              >
+                <span>{s.icon}</span> {s.label}
+              </button>
+            ))}
+          </div>
+
+          <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-2)', marginTop: '24px', fontFamily: 'var(--font-body)' }}>
+            No account?{' '}
+            <Link href="/auth/register" style={{ color: 'var(--pink)', fontWeight: 700, textDecoration: 'none' }}>
+              Sign up free →
+            </Link>
+          </p>
         </div>
       </div>
+
+      <style>{`
+        @media (min-width: 900px) {
+          .login-left-panel { display: flex !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
-export default function LoginPage() {
+export default function ConsumerLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F1117] flex items-center justify-center text-gray-400">Loading...</div>}>
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+        Loading…
+      </div>
+    }>
       <LoginForm />
     </Suspense>
   );

@@ -60,7 +60,7 @@ class ScannerApiService {
         'publicKeyPem': publicKeyPem,
         'deviceModel': ?deviceModel,
       }),
-    );
+    ).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 
@@ -82,7 +82,7 @@ class ScannerApiService {
         'eventId': eventId,
         'gateId': gateId,
       }),
-    );
+    ).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 
@@ -97,7 +97,7 @@ class ScannerApiService {
     final headers = await _buildHeaders(method: 'GET', path: path, authToken: authToken);
 
     final uri = Uri.parse('$baseUrl$path?deviceId=$deviceId&gateId=$gateId');
-    final res = await http.get(uri, headers: headers);
+    final res = await http.get(uri, headers: headers).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 
@@ -121,7 +121,7 @@ class ScannerApiService {
         'gateId': gateId,
         'deviceId': deviceId,
       }),
-    );
+    ).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 
@@ -143,7 +143,7 @@ class ScannerApiService {
         'eventId': eventId,
         'records': records,
       }),
-    );
+    ).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 
@@ -157,7 +157,7 @@ class ScannerApiService {
     final headers = await _buildHeaders(method: 'GET', path: path, authToken: authToken);
 
     final uri = Uri.parse('$baseUrl$path?eventId=$eventId&query=${Uri.encodeComponent(query)}');
-    final res = await http.get(uri, headers: headers);
+    final res = await http.get(uri, headers: headers).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapList(res);
   }
 
@@ -181,7 +181,7 @@ class ScannerApiService {
         'gateId': gateId,
         'deviceId': deviceId,
       }),
-    );
+    ).timeout(const Duration(seconds: 8));
     return ApiEnvelope.unwrapMap(res);
   }
 }

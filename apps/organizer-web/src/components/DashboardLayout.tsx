@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@platform/auth';
-import { DashboardLayout as SharedDashboardLayout, Button } from '@platform/ui';
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,70 +12,150 @@ export interface DashboardLayoutProps {
   actions?: React.ReactNode;
 }
 
-export function DashboardLayout({ children, title, subtitle, actions }: DashboardLayoutProps) {
+const NAV_ITEMS = [
+  { href: '/',             label: 'Overview',    icon: '📊' },
+  { href: '/events',       label: 'Events',      icon: '🎪' },
+  { href: '/orders',       label: 'Orders',      icon: '🎟️' },
+  { href: '/promoters',    label: 'Promoters',   icon: '🚀' },
+  { href: '/team',         label: 'Team',        icon: '👥' },
+  { href: '/settlements',  label: 'Settlements', icon: '💰' },
+];
+
+export function DashboardLayout({ children, title = 'Dashboard', subtitle, actions }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, organizations, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const activeOrg = organizations.find((o) => o.type === 'organizer' && o.status === 'active') ?? organizations[0];
+  const activeOrg = organizations?.find(o => o.type === 'organizer' && o.status === 'active') ?? organizations?.[0];
+  const displayName = profile?.name ?? user?.email?.split('@')[0] ?? 'Organizer';
+  const initial = displayName.charAt(0).toUpperCase();
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', href: '/', icon: <span>📊</span> },
-    { id: 'events', label: 'Events', href: '/events', icon: <span>🎪</span> },
-    { id: 'orders', label: 'Orders', href: '/orders', icon: <span>🎟️</span> },
-    { id: 'promoters', label: 'Promoters', href: '/promoters', icon: <span>🚀</span> },
-    { id: 'team', label: 'Team', href: '/team', icon: <span>👥</span> },
-    { id: 'settlements', label: 'Settlements', href: '/settlements', icon: <span>💰</span> },
-  ];
+  const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
+    <div className="dash-sidebar" style={{ height: onClose ? '100vh' : undefined }}>
+      {/* Brand */}
+      <div style={{
+        padding: '20px 16px 16px',
+        borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="spin-slow" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)' }}>✳</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: '#fff', letterSpacing: '0.06em' }}>
+              {activeOrg?.name?.toUpperCase() ?? 'ORGANIZER'}
+            </span>
+          </div>
+          <span style={{
+            display: 'inline-flex', marginTop: '6px',
+            background: 'var(--pink-dim)', color: 'var(--pink)',
+            border: '1px solid rgba(255,31,109,0.25)',
+            borderRadius: '100px', fontSize: '9px', fontWeight: 700,
+            letterSpacing: '0.1em', padding: '2px 8px', textTransform: 'uppercase',
+          }}>Organizer Console</span>
+        </div>
+        {onClose && (
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '18px', cursor: 'pointer', padding: '4px' }}>✕</button>
+        )}
+      </div>
 
-  const defaultActions = actions || (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <span
-        style={{
-          fontSize: '11px',
-          padding: '4px 10px',
-          borderRadius: '9999px',
-          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-          color: '#10B981',
-          border: '1px solid rgba(16, 185, 129, 0.25)',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }} />
-        Live Backend
-      </span>
-      <Link href="/events/new">
-        <Button variant="brand-glow" size="sm">
+      {/* Nav */}
+      <div style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+        <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-3)', padding: '0 8px', marginBottom: '8px' }}>Navigation</p>
+        {NAV_ITEMS.map(item => {
+          const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={`dash-nav-item${isActive ? ' active' : ''}`}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Quick Create */}
+      <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+        <Link
+          href="/events/new"
+          className="btn-primary"
+          style={{ width: '100%', textDecoration: 'none', justifyContent: 'center', padding: '9px 16px', borderRadius: '8px' }}
+        >
           + Create Event
-        </Button>
-      </Link>
+        </Link>
+      </div>
+
+      {/* User Footer */}
+      <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--pink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: '#fff', flexShrink: 0 }}>
+          {initial}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
+          <p style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+        </div>
+        <button type="button" onClick={() => logout()} title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '14px', padding: '4px', flexShrink: 0 }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--pink)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}>↩</button>
+      </div>
     </div>
   );
 
   return (
-    <SharedDashboardLayout
-      appName="EventFlow"
-      appBadge="ORGANIZER"
-      appBadgeColor="brand"
-      navItems={navItems}
-      currentPath={pathname || '/'}
-      onNavigate={(href) => router.push(href)}
-      title={title ?? 'Organizer Console'}
-      subtitle={subtitle}
-      actions={defaultActions}
-      user={{
-        name: profile?.name ?? user?.email?.split('@')[0] ?? 'Organizer',
-        email: user?.email,
-        role: 'Event Director',
-      }}
-      organizationName={activeOrg?.name ?? 'Organizer HQ'}
-      organizationType={activeOrg?.type ?? 'ORGANIZER'}
-      onLogout={() => logout()}
-    >
-      {children}
-    </SharedDashboardLayout>
+    <div className="dash-shell">
+      <div style={{ display: 'none' }} className="dash-sidebar-desktop">
+        <SidebarContent />
+      </div>
+
+      {mobileOpen && (
+        <div className="dash-sidebar-overlay open" onClick={() => setMobileOpen(false)}>
+          <div className="dash-sidebar-mobile open" onClick={e => e.stopPropagation()}>
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      <div className="dash-main">
+        <div className="dash-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button type="button" onClick={() => setMobileOpen(true)} className="dash-hamburger" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '12px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '18px', height: '1.5px', background: 'currentColor', borderRadius: '1px' }} />
+            </button>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-2)', letterSpacing: '0.06em' }}>ORGANIZER</span>
+            <span style={{ color: 'var(--text-3)', fontSize: '16px' }}>/</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--text-1)', letterSpacing: '0.06em' }}>{(title || 'DASHBOARD').toUpperCase()}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
+              LIVE
+            </div>
+            {actions && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{actions}</div>}
+            <Link href="/events/new" className="btn-primary" style={{ textDecoration: 'none', padding: '7px 16px', fontSize: '12px' }}>+ New Event</Link>
+            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'var(--pink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px', color: '#fff' }}>{initial}</div>
+          </div>
+        </div>
+        <div className="dash-content">
+          <div className="dash-page-header">
+            <div>
+              <h1 className="dash-page-title">{(title || 'Dashboard').toUpperCase()}</h1>
+              {subtitle && <p className="dash-page-subtitle">{subtitle}</p>}
+            </div>
+          </div>
+          {children}
+        </div>
+      </div>
+
+      <style>{`
+        @media (min-width: 768px) { .dash-sidebar-desktop { display: flex !important; } .dash-hamburger { display: none !important; } }
+        @media (max-width: 767px) { .dash-sidebar-desktop { display: none !important; } }
+      `}</style>
+    </div>
   );
 }

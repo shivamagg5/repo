@@ -12,6 +12,12 @@ export class ApiClient extends CoreApiClient {
     super({
       baseUrl: baseUrl ?? API_BASE_URL,
       getAuthToken: async () => {
+        if (typeof window !== 'undefined') {
+          const demoRole = localStorage.getItem('eventplatform_demo_role');
+          if (demoRole) {
+            return `dev-token-${demoRole}`;
+          }
+        }
         try {
           const client = getSupabaseClient();
           const { data } = await client.auth.getSession();

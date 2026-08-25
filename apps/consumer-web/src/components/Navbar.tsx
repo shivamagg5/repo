@@ -1,162 +1,400 @@
-// =============================================================================
-// consumer-web — Navigation Header
-// Displays search, navigation links, and reactive authentication status.
-// =============================================================================
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 
 export function Navbar() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scrolled, setScrolled] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { status, profile, user, logout } = useAuth();
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const displayName = profile?.name || user?.user_metadata?.['name'] || user?.email?.split('@')[0] || 'User';
+  const isAuthed = status === 'authenticated';
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Close menu on route change
+  useEffect(() => { setMenuOpen(false); setSearchOpen(false); }, [pathname]);
+
+  // Lock body scroll when menu open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
+
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      router.push('/events');
+      router.push(`/events?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery('');
     }
   };
 
-  const displayName = profile?.name || user?.user_metadata?.['name'] || user?.email?.split('@')[0] || 'User';
+  const handleLogout = () => {
+    logout();
+    setMenuOpen(false);
+    window.location.href = '/';
+  };
+
+  const navLinks = [
+    { href: '/', label: 'Home', emoji: '🏠' },
+    { href: '/events', label: 'Events', emoji: '🎪' },
+    { href: '/events?datePreset=this_weekend', label: 'This Weekend', emoji: '📅' },
+    ...(isAuthed ? [{ href: '/tickets', label: 'My Tickets', emoji: '🎟️' }] : []),
+    ...(isAuthed ? [{ href: '/profile', label: 'My Profile', emoji: '👤' }] : []),
+  ];
 
   return (
-    <header className="glass-surface sticky top-0 z-50 border-b border-[var(--color-border,#262A36)] bg-[#0F1117]/90 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white text-lg shadow-lg group-hover:scale-105 transition-transform">
-            E
-          </div>
-          <span className="font-extrabold text-xl tracking-tight text-white">
-            EventPlatform
-          </span>
-        </Link>
+    <>
+      {/* ── NAVBAR BAR ── */}
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          background: scrolled ? 'rgba(8,8,8,0.95)' : 'transparent',
+          backdropFilter: scrolled ? 'blur(16px)' : 'none',
+          borderBottom: scrolled ? '1px solid rgba(255,255,255,0.07)' : '1px solid transparent',
+          transition: 'all 250ms ease',
+        }}
+      >
+        <div style={{
+          maxWidth: '1280px',
+          margin: '0 auto',
+          padding: '0 20px',
+          height: '64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}>
 
-        {/* Global Search Input */}
-        <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 max-w-md mx-4">
-          <div className="relative w-full">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search concerts, comedies, festivals, venues..."
-              className="w-full bg-[#161922] text-white placeholder-gray-400 text-sm rounded-full px-4 py-2 pl-10 border border-gray-700 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-            />
-            <svg
-              className="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </form>
+          {/* Logo */}
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '22px',
+              color: 'var(--pink)',
+              letterSpacing: '0.05em',
+            }}>✳</span>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '20px',
+              color: '#fff',
+              letterSpacing: '0.1em',
+            }}>EVENTPLATFORM</span>
+          </Link>
 
-        {/* Navigation Links & Auth Actions */}
-        <div className="flex items-center gap-4">
-          <nav className="hidden sm:flex items-center gap-6 text-sm font-medium">
-            <Link href="/events" className="text-gray-300 hover:text-white transition-colors">
-              Events
-            </Link>
-            <Link href="/venues" className="text-gray-300 hover:text-white transition-colors">
-              Venues
-            </Link>
+          {/* Desktop Nav Links */}
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }} className="hidden-mobile">
+            {['Events', 'Venues'].map(item => (
+              <Link
+                key={item}
+                href={`/${item.toLowerCase()}`}
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: pathname === `/${item.toLowerCase()}` ? 'var(--pink)' : 'var(--text-2)',
+                  transition: 'color 150ms',
+                  textDecoration: 'none',
+                }}
+              >
+                {item}
+              </Link>
+            ))}
           </nav>
 
-          {status === 'loading' ? (
-            <div className="w-8 h-8 rounded-full bg-gray-800 animate-pulse" />
-          ) : status === 'authenticated' ? (
-            <div className="relative">
+          {/* Right Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Search Icon */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-2)',
+                padding: '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'color 150ms',
+              }}
+              aria-label="Search"
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+
+            {/* Auth Status (desktop) */}
+            {status !== 'loading' && (
+              isAuthed ? (
+                <Link
+                  href="/tickets"
+                  className="hidden-mobile"
+                  style={{
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '100px',
+                    padding: '7px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: 'var(--text-1)',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ fontSize: '11px', background: 'var(--pink)', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {displayName.charAt(0).toUpperCase()}
+                  </span>
+                  {displayName.split(' ')[0]}
+                </Link>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="hidden-mobile btn-neon"
+                  style={{ textDecoration: 'none', padding: '8px 20px' }}
+                >
+                  Sign In
+                </Link>
+              )
+            )}
+
+            {/* Hamburger */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-1)',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '5px',
+              }}
+            >
+              <span style={{ display: 'block', width: '22px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '22px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── SEARCH OVERLAY ── */}
+      {searchOpen && (
+        <div
+          onClick={() => setSearchOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 999,
+            background: 'rgba(8,8,8,0.92)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '80px 20px 20px',
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '600px' }}>
+            <form onSubmit={handleSearch} style={{ position: 'relative' }}>
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search events, artists, venues..."
+                style={{
+                  width: '100%',
+                  background: 'var(--surface-1)',
+                  border: '2px solid var(--pink)',
+                  borderRadius: '100px',
+                  color: '#fff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '16px',
+                  padding: '16px 56px 16px 24px',
+                  outline: 'none',
+                  boxShadow: 'var(--shadow-pink)',
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'var(--pink)', border: 'none', borderRadius: '100px',
+                  padding: '8px 16px', cursor: 'pointer', color: '#fff',
+                  fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: '13px',
+                }}
+              >
+                Go
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(false)}
+              style={{
+                marginTop: '16px', background: 'none', border: 'none',
+                color: 'var(--text-2)', cursor: 'pointer', fontSize: '13px',
+                fontFamily: 'var(--font-body)', display: 'block', width: '100%', textAlign: 'center',
+              }}
+            >
+              Press Esc to close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULLSCREEN MENU OVERLAY (like reference image) ── */}
+      {menuOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: '#0A0A0A',
+          display: 'flex', flexDirection: 'column',
+          overflowY: 'auto',
+        }}>
+          {/* Menu Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '20px 24px',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '18px', letterSpacing: '0.1em', color: 'var(--pink)',
+            }}>✳ EVENTPLATFORM</span>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-1)', fontSize: '24px', lineHeight: 1, padding: '4px',
+              }}
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Menu Items */}
+          <nav style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {navLinks.map((link, i) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    background: isActive ? 'var(--pink)' : 'transparent',
+                    textDecoration: 'none',
+                    borderBottom: i < navLinks.length - 1 ? '1px solid var(--border)' : 'none',
+                    transition: 'background 150ms',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <span style={{
+                      width: '40px', height: '40px',
+                      background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--surface-2)',
+                      borderRadius: '10px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '18px',
+                    }}>
+                      {link.emoji}
+                    </span>
+                    <span style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '28px',
+                      letterSpacing: '0.05em',
+                      color: isActive ? '#fff' : 'var(--text-1)',
+                    }}>
+                      {link.label.toUpperCase()}
+                    </span>
+                  </div>
+                  <span style={{ color: isActive ? '#fff' : 'var(--text-3)', fontSize: '20px' }}>↗</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Menu Footer */}
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)' }}>
+            {isAuthed ? (
               <button
                 type="button"
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center gap-2.5 p-1.5 rounded-full hover:bg-gray-800 transition-colors text-sm font-medium text-white focus:outline-none"
+                onClick={handleLogout}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '16px 20px', borderRadius: '12px',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-2)',
+                }}
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs uppercase shadow-md">
-                  {displayName.charAt(0)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <span style={{
+                    width: '40px', height: '40px', background: 'var(--surface-2)',
+                    borderRadius: '10px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: '18px',
+                  }}>🚪</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '28px', letterSpacing: '0.05em', color: 'var(--text-2)' }}>
+                    LOG OUT
+                  </span>
                 </div>
-                <span className="hidden md:inline max-w-[120px] truncate">{displayName}</span>
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <span style={{ fontSize: '20px' }}>←</span>
               </button>
-
-              {menuOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-56 bg-[#161922] border border-gray-800 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+            ) : (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <Link
+                  href="/auth/login"
                   onClick={() => setMenuOpen(false)}
+                  className="btn-neon"
+                  style={{ flex: 1, textDecoration: 'none', textAlign: 'center', justifyContent: 'center' }}
                 >
-                  <div className="px-4 py-2 border-b border-gray-800">
-                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
-                    <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-                  </div>
-                  <Link
-                    href="/tickets"
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800/80 hover:text-white transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                    </svg>
-                    My Tickets
-                  </Link>
-                  <Link
-                    href="/orders"
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800/80 hover:text-white transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    Order History
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800/80 hover:text-white transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Account Settings
-                  </Link>
-                  <div className="border-t border-gray-800 my-1" />
-                  <button
-                    type="button"
-                    onClick={() => logout()}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors text-left"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Link
-                href="/auth/login"
-                className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-3 py-1.5"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/auth/register"
-                className="text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-4 py-2 rounded-xl shadow-md transition-all"
-              >
-                Get Started
-              </Link>
-            </div>
-          )}
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  onClick={() => setMenuOpen(false)}
+                  className="btn-ghost"
+                  style={{ flex: 1, textDecoration: 'none', textAlign: 'center', justifyContent: 'center' }}
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      )}
+
+      <style>{`
+        @media (min-width: 768px) {
+          .hidden-mobile { display: flex !important; }
+        }
+        @media (max-width: 767px) {
+          .hidden-mobile { display: none !important; }
+        }
+      `}</style>
+    </>
   );
 }

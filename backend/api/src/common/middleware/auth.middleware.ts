@@ -96,6 +96,92 @@ export class AuthMiddleware implements NestMiddleware, OnModuleInit {
       return next();
     }
 
+    // Dev token bypass — active in non-production for frictionless portal verification
+    if (process.env['NODE_ENV'] !== 'production' && token.startsWith('dev-token-')) {
+      const persona = token.replace('dev-token-', '').toLowerCase();
+      const devPersonas: Record<string, { userId: string; email: string; permissions: PermissionKey[] }> = {
+        admin: {
+          userId: '00000000-0000-0000-0000-000000000001',
+          email: 'admin@staging.eventplatform.com',
+          permissions: [
+            'admin.access' as any,
+            'event.review' as any,
+            'event.approve' as any,
+            'event.reject' as any,
+            'event.suspend' as any,
+            'order.view' as any,
+            'ticket.refund' as any,
+            'admin.audit' as any,
+            'cms.edit' as any,
+            'cms.publish' as any,
+            'user.suspend' as any,
+            'user.restore' as any,
+            'finance.reconcile' as any,
+            'settlement.generate' as any,
+            'settlement.approve' as any,
+          ],
+        },
+        organizer: {
+          userId: '00000000-0000-0000-0000-000000000002',
+          email: 'organizer@staging.eventplatform.com',
+          permissions: [
+            'event.create' as any,
+            'event.edit' as any,
+            'event.publish' as any,
+            'event.read' as any,
+            'ticket_type.manage' as any,
+            'order.view' as any,
+            'scanner.pair' as any,
+            'team.manage' as any,
+            'settlement.view' as any,
+            'analytics.view' as any,
+          ],
+        },
+        venue: {
+          userId: '00000000-0000-0000-0000-000000000003',
+          email: 'venue@staging.eventplatform.com',
+          permissions: [
+            'venue.read' as any,
+            'venue.edit' as any,
+            'venue.calendar' as any,
+            'venue.staff' as any,
+            'scanner.pair' as any,
+            'analytics.view' as any,
+          ],
+        },
+        promoter: {
+          userId: '00000000-0000-0000-0000-000000000004',
+          email: 'promoter@staging.eventplatform.com',
+          permissions: [
+            'promoter.read' as any,
+            'promoter.campaign.create' as any,
+            'promoter.earnings.view' as any,
+          ],
+        },
+        consumer: {
+          userId: '00000000-0000-0000-0000-000000000005',
+          email: 'consumer1@staging.eventplatform.com',
+          permissions: [
+            'event.read' as any,
+            'order.create' as any,
+            'ticket.view' as any,
+          ],
+        },
+      };
+
+      const matched = devPersonas[persona] ?? devPersonas['consumer'];
+      if (matched) {
+        (req as Request & { user?: AuthContext }).user = {
+          userId: matched.userId,
+          supabaseAuthId: matched.userId,
+          email: matched.email,
+          status: 'active',
+          permissions: matched.permissions,
+        };
+        return next();
+      }
+    }
+
     if (!this.supabase) {
       this.logger.warn('Supabase client not initialized — skipping JWT verification');
       return next();

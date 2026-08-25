@@ -59,76 +59,104 @@ export default function VenueOverviewPage() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 bg-slate-900/60 rounded-xl border border-slate-800 animate-pulse" />
+              <div key={i} className="stat-card skeleton h-32" />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 font-medium">Total Venue Capacity</span>
-              <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">
-                {profile?.capacity ? `${profile.capacity.toLocaleString('en-IN')} seats` : 'Not Configured'}
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Total Venue Capacity</span>
+                <span className="badge badge-cyan text-[10px]">Configured</span>
+              </div>
+              <p className="stat-card-value text-white mt-1">
+                {profile?.capacity ? profile.capacity.toLocaleString('en-IN') : 'Flexible'}
               </p>
-              <p className="text-[11px] text-blue-400 mt-1">Multi-tier seating configuration</p>
+              <div className="stat-card-delta up">
+                <span className="metric-dot cyan" />
+                Multi-tier seating configuration
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 font-medium">Venue Location</span>
-              <p className="text-lg font-bold text-slate-100 mt-1">{profile?.name ?? 'Venue Partner'}</p>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium">
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Venue Location</span>
+                <span className="badge badge-green text-[10px]">Active</span>
+              </div>
+              <p className="font-display text-2xl text-white mt-2 tracking-wide uppercase">{profile?.name ?? 'Venue Partner'}</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">
                 {profile?.city ? `${profile.city}, ${profile.state ?? profile.country ?? ''}` : 'Location details in profile'}
               </p>
             </div>
 
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 font-medium">Operating Status</span>
-              <div className="mt-2">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
-                  {profile?.status ?? 'active'}
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Operating Status</span>
+                <span className="badge badge-pink text-[10px]">
+                  {profile?.status ?? 'Active'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2 font-mono">Timezone: {profile?.timezone ?? 'Asia/Kolkata'}</p>
+              <p className="stat-card-value text-white mt-1 font-mono text-xl">
+                {profile?.timezone ?? 'Asia/Kolkata'}
+              </p>
+              <div className="stat-card-delta neutral">
+                <span className="metric-dot pink" />
+                Primary operating timezone
+              </div>
             </div>
           </div>
         )}
 
         {/* Hosted Events Stream */}
-        <div className="glass-panel p-5 rounded-xl border border-slate-800">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-base font-bold text-slate-200">Upcoming Hosted Events ({events.length})</h3>
-            <Link href="/calendar" className="text-xs text-blue-400 hover:text-blue-300 font-medium">
+        <div className="surface-card">
+          <div className="surface-card-header">
+            <h3 className="surface-card-title flex items-center gap-2">
+              <span className="metric-dot green" />
+              Upcoming Hosted Events ({events.length})
+            </h3>
+            <Link href="/calendar" className="text-xs text-green hover:text-cyan font-semibold transition-colors">
               View Calendar →
             </Link>
           </div>
 
-          {loading ? (
-            <div className="py-12 text-center text-xs text-slate-400 animate-pulse">Loading hosted events...</div>
-          ) : events.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-xs">
-              No upcoming events scheduled at this venue.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {events.map((evt) => (
-                <div key={evt.id} className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-100 text-sm">{evt.title}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Organizer: {evt.organization?.name ?? 'Live Organizer'} · {evt.startsAt ? new Date(evt.startsAt).toLocaleString('en-IN') : 'TBD'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
-                      {evt.status}
-                    </span>
-                    {evt.ticketsSold !== undefined && (
-                      <p className="text-xs text-slate-300 mt-1 font-mono">{evt.ticketsSold} tickets sold</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="surface-card-body p-0">
+            {events.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-mono">
+                No events currently scheduled at this venue.
+              </div>
+            ) : (
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>Event Title</th>
+                    <th>Date & Time</th>
+                    <th>Capacity Assigned</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((evt) => (
+                    <tr key={evt.id}>
+                      <td className="font-semibold text-slate-100">{evt.title}</td>
+                      <td className="text-xs text-slate-400">
+                        {new Date(evt.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="font-mono text-xs text-slate-300">{evt.capacity ?? 'Default'}</td>
+                      <td>
+                        <span className="badge badge-green text-[10px]">{evt.status}</span>
+                      </td>
+                      <td>
+                        <Link href={`/events/${evt.id}`} className="text-xs text-pink hover:underline font-semibold">
+                          Details →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
     </VenueLayout>

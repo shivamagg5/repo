@@ -8,7 +8,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { AdminLayout } from '../components/AdminLayout';
 import { apiClient, ApiError } from '../lib/api';
-import { StatCard, Card, Badge, Button, Skeleton } from '@platform/ui';
 
 interface DashboardMetrics {
   totalUsers: number;
@@ -37,7 +36,6 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      // Parallel fetch of real backend endpoints
       const [usersRes, reviewRes, auditRes, platformRes] = await Promise.allSettled([
         apiClient.getAdminUsers<any>(),
         apiClient.getAdminEventReviewQueue<any>(),
@@ -97,9 +95,9 @@ export default function AdminDashboardPage() {
       subtitle="Authoritative ecosystem telemetry, financial overview, and governance sentinel"
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={fetchDashboardData}>
+          <button type="button" className="btn-secondary text-xs" onClick={fetchDashboardData}>
             🔄 Refresh Telemetry
-          </Button>
+          </button>
         </div>
       }
     >
@@ -118,257 +116,207 @@ export default function AdminDashboardPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} height="120px" variant="rect" />
+              <div key={i} className="stat-card skeleton h-32" />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label="Platform Gross Volume (GMV)"
-              value={formatCurrency(metrics?.platformMetrics?.totalGmvMinor ?? 0)}
-              icon={<span>💎</span>}
-              caption={`${metrics?.platformMetrics?.totalOrdersCount ?? 0} total paid orders`}
-            />
-            <StatCard
-              label="Tickets Issued"
-              value={metrics?.platformMetrics?.totalTicketsIssued?.toLocaleString('en-IN') ?? 0}
-              icon={<span>🎟️</span>}
-              caption={`Across ${metrics?.platformMetrics?.activeEventsCount ?? 0} active events`}
-            />
-            <StatCard
-              label="Moderation Backlog"
-              value={metrics?.pendingReviewsCount ?? 0}
-              icon={<span>🛡️</span>}
-              caption="Events awaiting moderator decision"
-            />
-            <StatCard
-              label="Active Accounts"
-              value={metrics?.activeUsers ?? 0}
-              icon={<span>👥</span>}
-              caption={`${metrics?.suspendedUsers ?? 0} suspended accounts`}
-            />
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Gross Volume (GMV)</span>
+                <span className="badge badge-green text-[10px]">Authoritative</span>
+              </div>
+              <p className="stat-card-value text-white mt-1">{formatCurrency(metrics?.platformMetrics?.totalGmvMinor ?? 0)}</p>
+              <div className="stat-card-delta up">
+                <span className="metric-dot green" />
+                {metrics?.platformMetrics?.totalOrdersCount ?? 0} paid transactions
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Tickets Issued</span>
+                <span className="badge badge-pink text-[10px]">Live Total</span>
+              </div>
+              <p className="stat-card-value text-white mt-1">{(metrics?.platformMetrics?.totalTicketsIssued ?? 0).toLocaleString('en-IN')}</p>
+              <div className="stat-card-delta neutral">
+                <span className="metric-dot pink" />
+                {metrics?.platformMetrics?.activeEventsCount ?? 0} active events
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Moderation Backlog</span>
+                <span className="badge badge-orange text-[10px]">Queue</span>
+              </div>
+              <p className="stat-card-value text-white mt-1">{metrics?.pendingReviewsCount ?? 0}</p>
+              <div className="stat-card-delta neutral">
+                <span className="metric-dot orange" />
+                Events awaiting review
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Active Accounts</span>
+                <span className="badge badge-cyan text-[10px]">Users</span>
+              </div>
+              <p className="stat-card-value text-white mt-1">{metrics?.activeUsers ?? 0}</p>
+              <div className="stat-card-delta up">
+                <span className="metric-dot cyan" />
+                {metrics?.suspendedUsers ?? 0} suspended
+              </div>
+            </div>
           </div>
         )}
 
         {/* Secondary Metric Strip: Health & Conversion Ratios */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-2xl bg-[#0B0E17] border border-slate-800 space-y-1">
+          <div className="p-4 rounded-xl bg-surface-1 border border-border space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Average Order Value</span>
-              <span className="text-xs text-purple-400 font-mono font-bold">AOV</span>
+              <span className="text-xs text-pink font-mono font-bold">AOV</span>
             </div>
             <p className="text-xl font-extrabold text-white font-mono">
               {formatCurrency(metrics?.platformMetrics?.averageOrderValueMinor ?? 0)}
             </p>
-            <p className="text-[11px] text-slate-500">Gross revenue per completed transaction</p>
+            <p className="text-[11px] text-slate-400">Gross revenue per completed transaction</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#0B0E17] border border-slate-800 space-y-1">
+          <div className="p-4 rounded-xl bg-surface-1 border border-border space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Checkout Dropoff</span>
-              <span className="text-xs text-amber-400 font-mono font-bold">
+              <span className="text-xs text-orange font-mono font-bold">
                 {metrics?.platformMetrics?.checkoutDropoffRatePercent ?? 12.4}%
               </span>
             </div>
             <p className="text-xl font-extrabold text-slate-200 font-mono">
               {metrics?.platformMetrics?.checkoutDropoffRatePercent ?? 12.4}%
             </p>
-            <p className="text-[11px] text-slate-500">Cart reservation to payment dropoff rate</p>
+            <p className="text-[11px] text-slate-400">Cart reservation to payment dropoff rate</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#0B0E17] border border-slate-800 space-y-1">
+          <div className="p-4 rounded-xl bg-surface-1 border border-border space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Refund Rate</span>
-              <span className="text-xs text-emerald-400 font-mono font-bold">
+              <span className="text-xs text-green font-mono font-bold">
                 {metrics?.platformMetrics?.refundRatePercent ?? 0.8}%
               </span>
             </div>
-            <p className="text-xl font-extrabold text-emerald-400 font-mono">
+            <p className="text-xl font-extrabold text-green font-mono">
               {metrics?.platformMetrics?.refundRatePercent ?? 0.8}%
             </p>
-            <p className="text-[11px] text-slate-500">Well within 2.0% platform risk threshold</p>
+            <p className="text-[11px] text-slate-400">Well within 2.0% platform risk threshold</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#0B0E17] border border-slate-800 space-y-1">
+          <div className="p-4 rounded-xl bg-surface-1 border border-border space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Active Organizers</span>
-              <span className="text-xs text-blue-400 font-mono font-bold">Verified</span>
+              <span className="text-xs text-cyan font-mono font-bold">Verified</span>
             </div>
             <p className="text-xl font-extrabold text-slate-200 font-mono">
               {metrics?.platformMetrics?.activeOrganizersCount ?? 5}
             </p>
-            <p className="text-[11px] text-slate-500">Organizations with published events</p>
+            <p className="text-[11px] text-slate-400">Organizations with published events</p>
           </div>
         </div>
 
-        {/* Sentinel System Health & Live Architecture Monitor */}
-        <div className="p-5 rounded-2xl bg-[#0B0F19] border border-slate-800 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Platform Security & Sentinel Monitor
-            </h3>
-            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              ALL SYSTEMS OPERATIONAL
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-300">Database Pool (Postgres 17)</span>
-                <span className="text-emerald-400 font-mono font-bold">57 Tables</span>
-              </div>
-              <p className="text-[11px] text-slate-500">Row-Level Security (RLS) active & isolated</p>
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-300">Turnstile Scanner Trust</span>
-                <span className="text-emerald-400 font-mono font-bold">ECDSA P-256</span>
-              </div>
-              <p className="text-[11px] text-slate-500">Cryptographic offline key chain active</p>
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-300">Payment Gateway Ingestion</span>
-                <span className="text-emerald-400 font-mono font-bold">HMAC SHA-256</span>
-              </div>
-              <p className="text-[11px] text-slate-500">Live Razorpay webhook idempotency verified</p>
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-slate-300">Notification Outbox Engine</span>
-                <span className="text-emerald-400 font-mono font-bold">Active Retry</span>
-              </div>
-              <p className="text-[11px] text-slate-500">Guaranteed transactional delivery queue</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Grid: Quick Action Hub & Recent Immutable Audit Feed */}
+        {/* Operational Queues & Audit Trail Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Quick Governance Hub */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card variant="elevated" padding="md" className="space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
-                Command Navigation
+          {/* Quick Actions & Governance Tools */}
+          <div className="surface-card">
+            <div className="surface-card-header">
+              <h3 className="surface-card-title flex items-center gap-2">
+                <span className="metric-dot pink" />
+                Administrative Actions
               </h3>
-              <div className="space-y-2">
-                <Link
-                  href="/events"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>🛡️</span>
-                    <span className="text-xs font-semibold text-slate-200">Event Moderation Queue</span>
-                  </div>
-                  <Badge variant={metrics?.pendingReviewsCount ? 'warning' : 'neutral'} size="sm">
-                    {metrics?.pendingReviewsCount ?? 0}
-                  </Badge>
-                </Link>
-                <Link
-                  href="/orders"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>📦</span>
-                    <span className="text-xs font-semibold text-slate-200">Orders & Refunds</span>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Inspect →</span>
-                </Link>
-                <Link
-                  href="/users"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>👥</span>
-                    <span className="text-xs font-semibold text-slate-200">User Governance</span>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">{metrics?.totalUsers ?? 0} Users →</span>
-                </Link>
-                <Link
-                  href="/finance"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>💰</span>
-                    <span className="text-xs font-semibold text-slate-200">Finance & General Ledger</span>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Reconcile →</span>
-                </Link>
-                <Link
-                  href="/settlements"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>⚖️</span>
-                    <span className="text-xs font-semibold text-slate-200">Organizer Settlements</span>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Payouts →</span>
-                </Link>
-                <Link
-                  href="/cms"
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#182035] hover:bg-[#222C46] border border-[var(--color-border)] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>🎨</span>
-                    <span className="text-xs font-semibold text-slate-200">CMS & Content Studio</span>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Banners →</span>
-                </Link>
-              </div>
-            </Card>
+            </div>
+            <div className="surface-card-body space-y-3">
+              <Link
+                href="/events"
+                className="block p-3.5 rounded-xl bg-pink-dim border border-pink/30 hover:border-pink hover:glow-pink transition-all group"
+              >
+                <p className="text-xs font-bold text-pink group-hover:text-white transition-colors">🛡️ Event Moderation Queue</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Review submissions & enforce compliance</p>
+              </Link>
+
+              <Link
+                href="/finance"
+                className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
+              >
+                <p className="text-xs font-bold text-slate-100">💰 Financial Ledger & Gateway</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Authoritative balance & Razorpay settlements</p>
+              </Link>
+
+              <Link
+                href="/cms"
+                className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
+              >
+                <p className="text-xs font-bold text-slate-100">🎨 CMS Curation & Hero Sliders</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Featured events & city discovery tags</p>
+              </Link>
+
+              <Link
+                href="/users"
+                className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
+              >
+                <p className="text-xs font-bold text-slate-100">👥 User Governance & MFA</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Role permissions & session suspension</p>
+              </Link>
+            </div>
           </div>
 
-          {/* Real Audit Activity Feed */}
-          <div className="lg:col-span-2">
-            <Card variant="elevated" padding="md" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
-                  Immutable Governance Audit Trail
-                </h3>
-                <Link href="/audit-logs" className="text-xs text-red-400 hover:underline font-semibold">
-                  Full Audit Ledger ({metrics?.recentAuditLogs?.length ?? 0}) →
-                </Link>
-              </div>
+          {/* Real-time System Audit Trail */}
+          <div className="lg:col-span-2 surface-card">
+            <div className="surface-card-header">
+              <h3 className="surface-card-title flex items-center gap-2">
+                <span className="metric-dot orange" />
+                Immutable System Audit Trail
+              </h3>
+              <Link href="/audit-logs" className="text-xs text-pink hover:text-orange font-semibold transition-colors">
+                Full Log Trail →
+              </Link>
+            </div>
 
-              {loading ? (
-                <div className="py-16 text-center text-xs text-slate-400 animate-pulse">
-                  Loading immutable audit trail records...
-                </div>
-              ) : !metrics?.recentAuditLogs || metrics.recentAuditLogs.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 text-xs">
-                  No governance audit log entries recorded.
+            <div className="surface-card-body p-0">
+              {metrics?.recentAuditLogs?.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs font-mono">
+                  No recent audit entries recorded.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-800/60">
-                  {metrics.recentAuditLogs.map((log, idx) => (
-                    <div key={log.id ?? idx} className="py-3 flex justify-between items-center text-xs">
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-slate-200 font-mono text-[11px] flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-800 text-slate-300 font-bold uppercase">
-                            {log.category ?? 'ADMIN'}
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Action</th>
+                      <th>Resource</th>
+                      <th>Actor ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(metrics?.recentAuditLogs ?? []).map((log, idx) => (
+                      <tr key={log.id ?? idx}>
+                        <td className="font-mono text-xs text-slate-400">
+                          {new Date(log.createdAt ?? Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td>
+                          <span className="badge badge-neutral font-mono text-[10px]">
+                            {log.action ?? 'EVENT_UPDATE'}
                           </span>
-                          {log.action ?? 'system.operation'}
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          Actor: <span className="text-slate-300 font-mono">{log.actorUserId ?? log.actorEmail ?? 'Admin'}</span>
-                          {log.entityId && (
-                            <> · Target: <span className="text-slate-300 font-mono">{log.entityId}</span></>
-                          )}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : 'Recent'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                        <td className="text-slate-200 font-medium">
+                          {log.resourceType ?? 'event'}:{log.resourceId?.slice(0, 8) ?? 'system'}
+                        </td>
+                        <td className="font-mono text-xs text-slate-400">
+                          {log.actorId ? log.actorId.slice(0, 8) : 'system'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
-            </Card>
+            </div>
           </div>
         </div>
       </div>

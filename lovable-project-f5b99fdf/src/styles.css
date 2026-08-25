@@ -1,0 +1,168 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-neon: var(--neon);
+  --color-neon-foreground: var(--neon-foreground);
+  --color-flame: var(--flame);
+  --color-flame-foreground: var(--flame-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-display: "Anton", "Arial Narrow", sans-serif;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 1rem;
+
+  --background: oklch(0.13 0.005 285);
+  --foreground: oklch(0.97 0.005 285);
+  --card: oklch(0.18 0.008 285);
+  --card-foreground: oklch(0.97 0.005 285);
+  --popover: oklch(0.18 0.008 285);
+  --popover-foreground: oklch(0.97 0.005 285);
+
+  /* hot pink — the loud one */
+  --primary: oklch(0.78 0.19 340);
+  --primary-foreground: oklch(0.15 0.02 340);
+
+  --secondary: oklch(0.24 0.01 285);
+  --secondary-foreground: oklch(0.97 0.005 285);
+
+  --muted: oklch(0.22 0.008 285);
+  --muted-foreground: oklch(0.68 0.01 285);
+
+  /* acid green */
+  --accent: oklch(0.87 0.22 145);
+  --accent-foreground: oklch(0.16 0.03 145);
+
+  --neon: oklch(0.85 0.19 195);
+  --neon-foreground: oklch(0.15 0.02 195);
+
+  /* marquee / ticket orange */
+  --flame: oklch(0.7 0.21 40);
+  --flame-foreground: oklch(0.15 0.02 40);
+
+  --destructive: oklch(0.63 0.24 27);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.3 0.01 285);
+  --input: oklch(0.3 0.01 285);
+  --ring: oklch(0.78 0.19 340);
+
+  --gradient-hot: linear-gradient(100deg, var(--primary), var(--flame));
+  --gradient-acid: linear-gradient(100deg, var(--accent), var(--neon));
+  --glow-pink: 0 0 0 1px color-mix(in oklab, var(--primary) 40%, transparent),
+    0 18px 60px -18px color-mix(in oklab, var(--primary) 70%, transparent);
+  --glow-acid: 0 18px 60px -20px color-mix(in oklab, var(--accent) 65%, transparent);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+@utility text-stroke {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--foreground);
+}
+
+@utility bg-hot {
+  background-image: var(--gradient-hot);
+}
+
+@utility bg-acid {
+  background-image: var(--gradient-acid);
+}
+
+@utility glow-pink {
+  box-shadow: var(--glow-pink);
+}
+
+@utility grain {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.22;
+    background-image: radial-gradient(
+      color-mix(in oklab, var(--foreground) 55%, transparent) 0.5px,
+      transparent 0.5px
+    );
+    background-size: 3px 3px;
+    mix-blend-mode: overlay;
+  }
+}
+
+@utility marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee-scroll 26s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility spin-slow {
+  animation: spin-slow 14s linear infinite;
+}

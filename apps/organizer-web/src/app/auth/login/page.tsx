@@ -1,130 +1,118 @@
-// =============================================================================
-// organizer-web — Organizer Login Page
-// Supports Email + Password and Google OAuth.
-// =============================================================================
 'use client';
 
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 
 function OrganizerLoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') || '/';
+  const rawRedirect = searchParams.get('redirectTo') || '/';
+  const redirectTo = rawRedirect.startsWith('/auth') ? '/' : rawRedirect;
+  const { login, loginAsDemo, error: authError, clearError } = useAuth();
 
-  const { login, loginWithGoogle, error: authError, clearError, isLoading } = useAuth();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('organizer1@staging.eventplatform.com');
+  const [password, setPassword] = useState('Organizer@12345');
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError(null);
-    clearError();
-
-    if (!email.trim() || !password) {
-      setLocalError('Please enter both email and password.');
-      return;
-    }
-
+    setLocalError(null); clearError();
+    if (!email.trim() || !password) { setLocalError('Both fields required.'); return; }
     setSubmitting(true);
     try {
       const res = await login(email.trim(), password);
-      if (res.success) {
-        router.push(redirectTo);
-      } else if (res.error) {
-        setLocalError(res.error);
-      }
-    } catch {
-      setLocalError('An unexpected error occurred during sign in.');
-    } finally {
-      setSubmitting(false);
-    }
+      if (res.success) { window.location.href = redirectTo; }
+      else if (res.error) { setLocalError(res.error); }
+    } catch { setLocalError('Unexpected error. Try again.'); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleDemo = async () => {
+    setSubmitting(true); setLocalError(null);
+    try {
+      const res = await loginAsDemo('organizer');
+      if (res.success) { window.location.href = redirectTo; }
+    } catch { setLocalError('Demo login failed.'); }
+    finally { setSubmitting(false); }
   };
 
   const displayError = localError || authError;
 
   return (
-    <div className="min-h-screen bg-[#0F1117] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white text-xl shadow-lg">
-            O
+    <div className="dash-login-page">
+      {/* Brand Panel */}
+      <div className="dash-login-brand-panel">
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,31,109,0.12) 0%, rgba(8,8,8,0.92) 70%)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'right' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(3rem, 6vw, 6rem)', lineHeight: 0.9, letterSpacing: '0.03em', color: '#fff', marginBottom: '16px' }}>
+            CREATE.<br/>MANAGE.<br/><span style={{ color: 'var(--pink)' }}>PROFIT.</span>
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.6, maxWidth: '220px', marginLeft: 'auto' }}>
+            Your event empire starts here. Create, promote, sell, and settle — all in one dashboard.
+          </p>
+          <div style={{ marginTop: '24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {['🎪 Events', '🎟️ Tickets', '💰 Revenue', '📊 Analytics'].map(tag => (
+              <span key={tag} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '11px', color: 'var(--text-2)', padding: '4px 12px' }}>{tag}</span>
+            ))}
           </div>
-          <span className="font-extrabold text-2xl tracking-tight text-white">
-            Organizer Portal
-          </span>
         </div>
-        <h2 className="text-center text-xl font-bold tracking-tight text-white">
-          Sign in to manage your events
-        </h2>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[#161922] py-8 px-4 shadow-2xl border border-gray-800 sm:rounded-2xl sm:px-10">
-          {displayError && (
-            <div className="mb-6 bg-red-950/50 border border-red-800 text-red-300 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{displayError}</span>
-            </div>
-          )}
-
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Work Email
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="organizer@example.com"
-                  className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="block w-full appearance-none rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-2.5 text-white placeholder-gray-500 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={submitting || isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all disabled:opacity-50"
-              >
-                {submitting ? 'Authenticating...' : 'Sign In to Dashboard'}
-              </button>
-            </div>
-          </form>
+      {/* Form Panel */}
+      <div className="dash-login-form-panel">
+        <div style={{ marginBottom: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)' }}>✳</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: '#fff', letterSpacing: '0.1em' }}>EVENTPLATFORM</span>
+          </div>
+          <span style={{ display: 'inline-flex', background: 'var(--pink-dim)', color: 'var(--pink)', border: '1px solid rgba(255,31,109,0.3)', borderRadius: '100px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '3px 10px' }}>ORGANIZER CONSOLE</span>
         </div>
+
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', lineHeight: 1, letterSpacing: '0.04em', color: '#fff', marginBottom: '6px' }}>
+          SIGN IN
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '32px' }}>
+          Manage your events, revenue, and team.
+        </p>
+
+        <button type="button" onClick={handleDemo} disabled={submitting} className="btn-pulse"
+          style={{ width: '100%', background: 'var(--pink)', border: 'none', borderRadius: '12px', color: '#fff', padding: '14px 20px', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, marginBottom: '20px', letterSpacing: '0.03em' }}>
+          {submitting ? 'Loading…' : '🚀 Organizer Demo — 1 Click'}
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          <span style={{ fontSize: '11px', color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>or email</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+        </div>
+
+        {displayError && (
+          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#fc8181', marginBottom: '16px' }}>
+            ⚠️ {displayError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '8px' }}>Email</label>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="organizer@company.com" className="dash-login-input" />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '8px' }}>Password</label>
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="dash-login-input" />
+          </div>
+          <button type="submit" disabled={submitting} style={{ width: '100%', background: 'var(--surface-2)', border: '1.5px solid var(--border-strong)', borderRadius: '12px', color: '#fff', padding: '13px 20px', fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, transition: 'background 150ms' }}>
+            {submitting ? 'Signing in…' : 'Sign In →'}
+          </button>
+        </form>
+
+        <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-3)', marginTop: '24px' }}>
+          Not an organizer?{' '}
+          <a href="http://localhost:3000" style={{ color: 'var(--pink)', fontWeight: 700 }}>EventPlatform →</a>
+        </p>
       </div>
     </div>
   );
@@ -132,7 +120,7 @@ function OrganizerLoginForm() {
 
 export default function OrganizerLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F1117] flex items-center justify-center text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading…</div>}>
       <OrganizerLoginForm />
     </Suspense>
   );

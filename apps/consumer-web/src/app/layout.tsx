@@ -4,46 +4,35 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'EventPlatform — Discover & Book Events Near You',
-    template: '%s | EventPlatform',
+    default: 'PULSR — Book Live Events, Festivals & Gigs in India',
+    template: '%s | PULSR',
   },
   description:
-    'Discover, book, and attend the best events near you. Music, comedy, sports, art, and more.',
-  keywords: ['events', 'tickets', 'concerts', 'shows', 'entertainment', 'book tickets'],
-  authors: [{ name: 'EventPlatform' }],
-  creator: 'EventPlatform',
+    'PULSR is the ticketing app for live music. Discover festivals, garba nights, raves and gigs across 100+ cities and grab tickets in seconds.',
+  keywords: ['events', 'tickets', 'concerts', 'live music', 'comedy', 'festivals', 'India', 'PULSR'],
+  authors: [{ name: 'PULSR' }],
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://eventplatform.app',
-    siteName: 'EventPlatform',
-    title: 'EventPlatform — Discover & Book Events Near You',
-    description:
-      'Discover, book, and attend the best events near you. Music, comedy, sports, art, and more.',
+    siteName: 'PULSR',
+    title: 'PULSR — Book Live Events, Festivals & Gigs in India',
+    description: 'Discover festivals, garba nights, raves and gigs across 100+ cities.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'EventPlatform — Discover & Book Events Near You',
-    description: 'Discover, book, and attend the best events near you.',
-  },
-  robots: {
-    index: true,
-    follow: true,
+    title: 'PULSR — Book Live Events, Festivals & Gigs in India',
+    description: 'Real tickets. Real nights.',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
           rel="stylesheet"
         />
       </head>

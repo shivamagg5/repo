@@ -83,133 +83,115 @@ export default function PromoterOverviewPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-28 bg-slate-900/60 rounded-xl border border-slate-800 animate-pulse" />
+              <div key={i} className="stat-card skeleton h-32" />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs text-slate-400 font-medium">Total Earned Commissions</span>
-                <span className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full font-semibold">Ledger Net</span>
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Total Earned</span>
+                <span className="badge badge-orange text-[10px]">Net Ledger</span>
               </div>
-              <p className="text-2xl font-bold text-slate-100 font-mono">{formatCurrency(totalEarnedMinor)}</p>
-              <p className="text-[11px] text-slate-500 mt-1">Pending Payout: {formatCurrency(pendingPayoutMinor)}</p>
+              <p className="stat-card-value text-white mt-1">{formatCurrency(totalEarnedMinor)}</p>
+              <div className="stat-card-delta up">
+                <span className="metric-dot orange" />
+                Pending: {formatCurrency(pendingPayoutMinor)}
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs text-slate-400 font-medium">Attributed Sales</span>
-                <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-semibold">1:1 Orders</span>
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Active Campaigns</span>
+                <span className="badge badge-pink text-[10px]">Live</span>
               </div>
-              <p className="text-2xl font-bold text-slate-100 font-mono">{earnings.length}</p>
-              <p className="text-[11px] text-slate-500 mt-1">Confirmed ticket orders</p>
+              <p className="stat-card-value text-white mt-1">{campaigns.length}</p>
+              <div className="stat-card-delta neutral">
+                <span className="metric-dot pink" />
+                Commission links active
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs text-slate-400 font-medium">Active Campaigns</span>
-                <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full font-semibold">Active</span>
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Pending Payout</span>
+                <span className="badge badge-yellow text-[10px]">Settling</span>
               </div>
-              <p className="text-2xl font-bold text-slate-100 font-mono">
-                {campaigns.filter((c) => c.status === 'active').length}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">Total: {campaigns.length} campaigns</p>
+              <p className="stat-card-value text-white mt-1">{formatCurrency(pendingPayoutMinor)}</p>
+              <div className="stat-card-delta neutral">
+                <span className="metric-dot yellow" />
+                Next settlement cycle
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-xl border border-slate-800">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs text-slate-400 font-medium">Commission Status</span>
-                <span className="text-xs text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-full font-semibold">Live</span>
+            <div className="stat-card">
+              <div className="flex justify-between items-start">
+                <span className="stat-card-label">Referral Orders</span>
+                <span className="badge badge-cyan text-[10px]">Conversion</span>
               </div>
-              <p className="text-sm font-bold text-emerald-400 mt-2">Active Affiliate</p>
-              <p className="text-[11px] text-slate-400 mt-1">Server tracking verified</p>
+              <p className="stat-card-value text-white mt-1">{earnings.length}</p>
+              <div className="stat-card-delta up">
+                <span className="metric-dot cyan" />
+                Direct attributed sales
+              </div>
             </div>
           </div>
         )}
 
-        {/* Active Campaigns Feed & One-Click Referral Link Tool */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 glass-panel p-5 rounded-xl border border-slate-800">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-bold text-slate-200">Active Affiliate Campaigns ({campaigns.length})</h3>
-              <Link href="/campaigns" className="text-xs text-violet-400 hover:text-violet-300 font-medium">
-                View All Campaigns →
-              </Link>
-            </div>
-
-            {loading ? (
-              <div className="py-12 text-center text-xs text-slate-400 animate-pulse">Loading campaigns...</div>
-            ) : campaigns.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
-                No active affiliate campaigns found. Join or create a campaign to start earning.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {campaigns.map((camp) => (
-                  <div key={camp.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-slate-100 text-sm">{camp.event?.title ?? camp.eventTitle ?? 'Affiliate Event'}</h4>
-                        <p className="text-xs text-slate-400 mt-0.5 font-mono">Code: <strong className="text-purple-300">{camp.code}</strong></p>
-                      </div>
-                      <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                        {camp.commissionType === 'percentage' ? `${camp.commissionValue}% Rate` : `₹${camp.commissionValue} Fixed`}
-                      </span>
-                    </div>
-
-                    {/* Referral Link Copy Bar */}
-                    <div className="flex items-center gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800">
-                      <span className="text-[11px] font-mono text-slate-400 truncate flex-1 px-2">
-                        {`${consumerOrigin}/events/${camp.event?.slug ?? camp.eventSlug ?? camp.eventId}?ref=${camp.code}`}
-                      </span>
-                      <button
-                        onClick={() => handleCopyLink(camp.code, camp.event?.slug ?? camp.eventSlug ?? camp.eventId)}
-                        className="px-3 py-1.5 rounded-md bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition-all whitespace-nowrap"
-                      >
-                        {copiedCode === camp.code ? '✓ Copied Link' : 'Copy Link'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Active Campaigns List */}
+        <div className="surface-card">
+          <div className="surface-card-header">
+            <h3 className="surface-card-title flex items-center gap-2">
+              <span className="metric-dot orange" />
+              Active Referral Campaigns ({campaigns.length})
+            </h3>
+            <Link href="/campaigns" className="text-xs text-orange hover:text-pink font-semibold transition-colors">
+              Manage Campaigns →
+            </Link>
           </div>
 
-          {/* Recent Attributed Sales Activity Stream */}
-          <div className="glass-panel p-5 rounded-xl border border-slate-800">
-            <h3 className="text-base font-bold text-slate-200 mb-4">Recent Attributed Orders ({earnings.length})</h3>
-            {loading ? (
-              <div className="py-12 text-center text-xs text-slate-400 animate-pulse">Loading orders...</div>
-            ) : earnings.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
-                No orders attributed to your referral codes yet.
+          <div className="surface-card-body p-0">
+            {campaigns.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-mono">
+                No active affiliate campaigns. Contact an organizer to receive referral links.
               </div>
             ) : (
-              <div className="space-y-3">
-                {earnings.slice(0, 5).map((sale) => (
-                  <div key={sale.id ?? sale.orderId} className="p-3 rounded-lg bg-slate-900/40 border border-slate-800/60 text-xs flex justify-between items-center">
-                    <div>
-                      <p className="font-mono text-violet-300 font-semibold">{sale.orderId ?? sale.id?.substring(0, 8)}</p>
-                      <p className="text-slate-400 text-[11px]">
-                        {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('en-IN') : 'Recent'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-200 font-mono">
-                        +{formatCurrency(sale.commissionEarnedMinor ?? sale.amountMinor ?? 0)}
-                      </p>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold ${
-                        sale.status === 'paid' ? 'text-emerald-400 bg-emerald-500/10' :
-                        sale.status === 'reversed' ? 'text-red-400 bg-red-500/10' :
-                        'text-amber-400 bg-amber-500/10'
-                      }`}>
-                        {sale.status ?? 'pending'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>Campaign & Event</th>
+                    <th>Referral Code</th>
+                    <th>Commission Rate</th>
+                    <th>Share Link</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((camp) => (
+                    <tr key={camp.id}>
+                      <td className="font-semibold text-slate-100">
+                        {camp.eventTitle ?? camp.title ?? 'Featured Event'}
+                      </td>
+                      <td>
+                        <span className="badge badge-orange font-mono text-xs">
+                          {camp.code}
+                        </span>
+                      </td>
+                      <td className="font-mono text-xs text-slate-300">
+                        {camp.commissionRate ? `${camp.commissionRate}%` : '5% Base'}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyLink(camp.code, camp.eventSlug ?? camp.eventId ?? 'event')}
+                          className="btn-secondary text-xs py-1.5 px-3"
+                        >
+                          {copiedCode === camp.code ? '✓ Link Copied' : '🔗 Copy Share Link'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>

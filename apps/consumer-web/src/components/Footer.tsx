@@ -1,54 +1,108 @@
-import React from 'react';
 import Link from 'next/link';
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] mt-20 py-12 text-sm text-[var(--color-text-secondary)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-purple-600 flex items-center justify-center font-bold text-white text-sm">
-              E
+    <footer style={{
+      background: 'var(--surface-1)',
+      borderTop: '1px solid var(--border)',
+      padding: '40px 24px',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '32px', marginBottom: '40px',
+        }}>
+          {/* Brand */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)' }}>✳</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: '#fff', letterSpacing: '0.1em' }}>EVENTPLATFORM</span>
             </div>
-            <span className="font-bold text-lg text-[var(--color-text-primary)]">EventPlatform</span>
+            <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.6, maxWidth: '200px' }}>
+              Real tickets. Real nights. No bots, no fakes.
+            </p>
           </div>
-          <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-            The next-generation live events ecosystem. Discover concerts, festivals, comedy, and sports near you.
+
+          {/* Events */}
+          <div>
+            <h4 style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '14px' }}>
+              Events
+            </h4>
+            {['Music & Concerts', 'Standup Comedy', 'Festivals', 'Sports', 'Arts & Culture'].map(item => (
+              <Link
+                key={item}
+                href={`/events?category=${item.toLowerCase().replace(/\s+/g, '-')}`}
+                style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px', textDecoration: 'none', transition: 'color 150ms' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
+              >
+                {item}
+              </Link>
+            ))}
+          </div>
+
+          {/* Cities */}
+          <div>
+            <h4 style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '14px' }}>
+              Cities
+            </h4>
+            {['Mumbai', 'Bengaluru', 'Delhi', 'Goa', 'Hyderabad'].map(city => (
+              <Link
+                key={city}
+                href={`/events?city=${city}`}
+                style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px', textDecoration: 'none', transition: 'color 150ms' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
+              >
+                {city}
+              </Link>
+            ))}
+          </div>
+
+          {/* Company */}
+          <div>
+            <h4 style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '14px' }}>
+              Company
+            </h4>
+            {['About', 'Blog', 'Careers', 'Press', 'Contact'].map(item => (
+              <Link
+                key={item}
+                href={`/${item.toLowerCase()}`}
+                style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px', textDecoration: 'none', transition: 'color 150ms' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
+              >
+                {item}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          paddingTop: '24px',
+          display: 'flex', flexWrap: 'wrap', gap: '12px',
+          alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+            © 2026 EventPlatform. All rights reserved.
           </p>
+          <div style={{ display: 'flex', gap: '20px' }}>
+            {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map(item => (
+              <Link
+                key={item}
+                href="/"
+                style={{ fontSize: '12px', color: 'var(--text-3)', textDecoration: 'none', transition: 'color 150ms' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
+              >
+                {item}
+              </Link>
+            ))}
+          </div>
         </div>
-
-        <div>
-          <h4 className="font-semibold text-[var(--color-text-primary)] mb-3">Explore</h4>
-          <ul className="space-y-2 text-xs">
-            <li><Link href="/events" className="hover:text-[var(--color-text-primary)]">All Events</Link></li>
-            <li><Link href="/venues" className="hover:text-[var(--color-text-primary)]">Venues</Link></li>
-            <li><Link href="/search" className="hover:text-[var(--color-text-primary)]">Search & Filters</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-semibold text-[var(--color-text-primary)] mb-3">Categories</h4>
-          <ul className="space-y-2 text-xs">
-            <li><Link href="/events?category=music" className="hover:text-[var(--color-text-primary)]">Music & Concerts</Link></li>
-            <li><Link href="/events?category=comedy" className="hover:text-[var(--color-text-primary)]">Standup Comedy</Link></li>
-            <li><Link href="/events?category=sports" className="hover:text-[var(--color-text-primary)]">Sports & Fitness</Link></li>
-            <li><Link href="/events?category=festival" className="hover:text-[var(--color-text-primary)]">Festivals & Fairs</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-semibold text-[var(--color-text-primary)] mb-3">Platform</h4>
-          <ul className="space-y-2 text-xs">
-            <li className="text-[var(--color-text-muted)]">Organizers & Venues</li>
-            <li className="text-[var(--color-text-muted)]">API & Developers</li>
-            <li className="text-[var(--color-text-muted)]">Security & Trust</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 pt-8 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)] flex flex-col sm:flex-row justify-between items-center gap-4">
-        <p>© {new Date().getFullYear()} EventPlatform Inc. All rights reserved.</p>
-        <p className="text-right">Powered by Event Ecosystem Foundation</p>
       </div>
     </footer>
   );
