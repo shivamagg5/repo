@@ -6,7 +6,7 @@ services:
     name: event-platform-api
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/config build && pnpm --filter @platform/api build
     startCommand: node backend/api/dist/main
     healthCheckPath: /api/v1/health
@@ -35,7 +35,7 @@ services:
     name: event-platform-consumer
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter consumer-web build
     startCommand: pnpm --filter consumer-web start
     envVars:
@@ -57,7 +57,7 @@ services:
     name: event-platform-organizer
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter organizer-web build
     startCommand: pnpm --filter organizer-web start
     envVars:
@@ -79,7 +79,7 @@ services:
     name: event-platform-admin
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter admin-web build
     startCommand: pnpm --filter admin-web start
     envVars:
@@ -101,7 +101,7 @@ services:
     name: event-platform-venue
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter venue-web build
     startCommand: pnpm --filter venue-web start
     envVars:
@@ -123,7 +123,7 @@ services:
     name: event-platform-promoter
     runtime: node
     plan: free
-    region: singapore
+    region: oregon
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter promoter-web build
     startCommand: pnpm --filter promoter-web start
     envVars:
