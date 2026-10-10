@@ -1,9 +1,12 @@
 services:
+  # =============================================================================
+  # 1. Central Backend NestJS API
+  # =============================================================================
   - type: web
     name: event-platform-api
     runtime: node
     plan: free
-    region: oregon
+    region: singapore
     buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/config build && pnpm --filter @platform/api build
     startCommand: node backend/api/dist/main
     healthCheckPath: /api/v1/health
@@ -12,8 +15,6 @@ services:
         value: "22.14.0"
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "3001"
       - key: SUPABASE_URL
         value: https://bthpeqgafgxomaqhjfrc.supabase.co
       - key: SUPABASE_ANON_KEY
@@ -27,3 +28,112 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
+  # =============================================================================
+  # 2. Consumer Web — Landing Page & Event Discovery (Next.js)
+  # =============================================================================
+  - type: web
+    name: event-platform-consumer
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter consumer-web build
+    startCommand: pnpm --filter consumer-web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://event-platform-api-r4og.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bthpeqgafgxomaqhjfrc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl
+
+  # =============================================================================
+  # 3. Organizer Web — Event & Ticketing Operations Dashboard (Next.js)
+  # =============================================================================
+  - type: web
+    name: event-platform-organizer
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter organizer-web build
+    startCommand: pnpm --filter organizer-web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://event-platform-api-r4og.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bthpeqgafgxomaqhjfrc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl
+
+  # =============================================================================
+  # 4. Admin Web — Platform Super Admin Operations Portal (Next.js)
+  # =============================================================================
+  - type: web
+    name: event-platform-admin
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter admin-web build
+    startCommand: pnpm --filter admin-web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://event-platform-api-r4og.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bthpeqgafgxomaqhjfrc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl
+
+  # =============================================================================
+  # 5. Venue Web — Nightlife & Venue Management Dashboard (Next.js)
+  # =============================================================================
+  - type: web
+    name: event-platform-venue
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter venue-web build
+    startCommand: pnpm --filter venue-web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://event-platform-api-r4og.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bthpeqgafgxomaqhjfrc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl
+
+  # =============================================================================
+  # 6. Promoter Web — Affiliate Campaigns & Commission Portal (Next.js)
+  # =============================================================================
+  - type: web
+    name: event-platform-promoter
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install -g pnpm@10.13.1 && pnpm install --frozen-lockfile && pnpm --filter @platform/types build && pnpm --filter @platform/validation build && pnpm --filter @platform/design-tokens build && pnpm --filter @platform/ui build && pnpm --filter @platform/api-client build && pnpm --filter @platform/auth build && pnpm --filter promoter-web build
+    startCommand: pnpm --filter promoter-web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://event-platform-api-r4og.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://bthpeqgafgxomaqhjfrc.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_n8txh3BqiMKQXt9KM1AnXQ_Re4yr4Fl
