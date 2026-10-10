@@ -47,7 +47,7 @@ export const refundStatusEnum = pgEnum('refund_status', [
   'requested', 'pending', 'processing', 'completed', 'failed', 'cancelled',
 ]);
 export const settlementStatusEnum = pgEnum('settlement_status', [
-  'draft', 'pending_review', 'approved', 'processing', 'paid', 'failed', 'cancelled',
+  'draft', 'pending_review', 'approved', 'processing', 'paid', 'failed', 'cancelled', 'rejected', 'on_hold',
 ]);
 export const checkinResultEnum = pgEnum('checkin_result', [
   'success', 'invalid', 'already_used', 'wrong_event',
@@ -107,9 +107,20 @@ export const organizations = pgTable('organizations', {
   description: text('description'),
   logoUrl: text('logo_url'),
   status: organizationStatusEnum('status').notNull().default('pending'),
+  kybStatus: text('kyb_status').notNull().default('unsubmitted'),
+  kybSubmittedAt: timestamp('kyb_submitted_at', { withTimezone: true }),
+  kybVerifiedAt: timestamp('kyb_verified_at', { withTimezone: true }),
+  kybRejectionReason: text('kyb_rejection_reason'),
+  legalEntityName: text('legal_entity_name'),
+  taxIdPan: text('tax_id_pan'),
+  gstin: text('gstin'),
+  businessAddressJson: text('business_address_json').default('{}'),
+  customCommissionRateBps: integer('custom_commission_rate_bps'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxOrganizationsKybStatus: index('idx_organizations_kyb_status').on(t.kybStatus),
+}));
 
 export const organizationMembers = pgTable('organization_members', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -201,6 +212,7 @@ export const events = pgTable('events', {
   capacity: integer('capacity'),
   ageRestriction: text('age_restriction'),
   publishedAt: timestamp('published_at', { withTimezone: true }),
+  affiliateCampaignsEnabled: boolean('affiliate_campaigns_enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -474,8 +486,18 @@ export const settlements = pgTable('settlements', {
   approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   rejectionReason: text('rejection_reason'),
+  paymentProfileId: uuid('payment_profile_id').references(() => paymentProfiles.id, { onDelete: 'restrict' }),
+  maskedAccountNumber: text('masked_account_number'),
+  ifsc: text('ifsc'),
+  transactionReference: text('transaction_reference'),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  disbursedBy: uuid('disbursed_by').references(() => users.id, { onDelete: 'set null' }),
+  disbursedIdempotencyKey: text('disbursed_idempotency_key').unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ unqSettlementScope: unique().on(t.organizationId, t.eventId, t.periodStart, t.periodEnd) }));
+}, (t) => ({
+  unqSettlementScope: unique().on(t.organizationId, t.eventId, t.periodStart, t.periodEnd),
+  ukSettlementsDisbursedIdempotency: unique().on(t.disbursedIdempotencyKey),
+}));
 
 export const settlementItems = pgTable('settlement_items', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -695,7 +717,9 @@ export const cmsFeaturedEvents = pgTable('cms_featured_events', {
   badgeText: text('badge_text'),
   status: text('status').notNull().default('published'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  unqCmsFeaturedEventsEventId: unique().on(t.eventId),
+}));
 
 export const cmsCollections = pgTable('cms_collections', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -752,6 +776,173 @@ export const analyticsAggregatesDaily = pgTable('analytics_aggregates_daily', {
   metricValue: bigint('metric_value', { mode: 'number' }).notNull().default(sql`0`),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({ unqAggregateDimension: unique().on(t.aggregateDate, t.metricName, t.dimensionType, t.dimensionId) }));
+
+// ---------------------------------------------------------------------------
+// ORGANIZER PAYOUT PROFILES & MARKETING LEDGER
+// ---------------------------------------------------------------------------
+export const paymentProfiles = pgTable('payment_profiles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  accountName: text('account_name').notNull(),
+  nickname: text('nickname').notNull(),
+  maskedAccountNumber: text('masked_account_number').notNull(),
+  ifsc: text('ifsc').notNull(),
+  panCard: text('pan_card').notNull(),
+  gstRegistered: boolean('gst_registered').notNull().default(false),
+  gstin: text('gstin'),
+  businessAddress: text('business_address'),
+  city: text('city'),
+  state: text('state'),
+  country: text('country').default('India'),
+  status: text('status').notNull().default('active'),
+  isDefault: boolean('is_default').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxPaymentProfilesOrg: index('idx_payment_profiles_org').on(t.organizationId),
+}));
+
+export const marketingCreditLedgers = pgTable('marketing_credit_ledgers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  transactionNumber: text('transaction_number').unique().notNull(),
+  deltaCredits: integer('delta_credits').notNull(),
+  balanceAfter: integer('balance_after').notNull(),
+  reason: text('reason').notNull(),
+  idempotencyKey: text('idempotency_key').unique(),
+  metadataJson: text('metadata_json').notNull().default('{}'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxMarketingLedgerOrg: index('idx_marketing_ledger_org').on(t.organizationId),
+  idxMarketingLedgerCreated: index('idx_marketing_ledger_created').on(t.createdAt),
+}));
+
+// ---------------------------------------------------------------------------
+// CUSTOMER SUPPORT NOTES
+// ---------------------------------------------------------------------------
+export const customerNotes = pgTable('customer_notes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  adminNotes: text('admin_notes').notNull(),
+  updatedBy: uuid('updated_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  unqCustomerNotesUser: unique().on(t.userId),
+  idxCustomerNotesUser: index('idx_customer_notes_user').on(t.userId),
+}));
+
+// ---------------------------------------------------------------------------
+// PROMOTER PAYOUTS
+// ---------------------------------------------------------------------------
+export const promoterPayouts = pgTable('promoter_payouts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  promoterId: uuid('promoter_id').notNull().references(() => promoterProfiles.id, { onDelete: 'cascade' }),
+  amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(),
+  currency: char('currency', { length: 3 }).notNull().default('INR'),
+  status: text('status').notNull().default('pending'),
+  payoutMethod: text('payout_method').notNull().default('bank_transfer'),
+  destinationReference: text('destination_reference').notNull(),
+  idempotencyKey: text('idempotency_key').unique().notNull(),
+  processedIdempotencyKey: text('processed_idempotency_key').unique(),
+  processedBy: uuid('processed_by').references(() => users.id, { onDelete: 'set null' }),
+  notes: text('notes'),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxPromoterPayoutsPromoter: index('idx_promoter_payouts_promoter').on(t.promoterId),
+  idxPromoterPayoutsStatus: index('idx_promoter_payouts_status').on(t.status),
+  ukPromoterPayoutsProcessedIdempotency: unique().on(t.processedIdempotencyKey),
+}));
+
+// ---------------------------------------------------------------------------
+// BROADCAST MARKETING CAMPAIGNS
+// ---------------------------------------------------------------------------
+export const marketingCampaigns = pgTable('marketing_campaigns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: text('type').notNull().default('sms'),
+  content: text('content').notNull(),
+  targetAudienceCount: integer('target_audience_count').notNull().default(0),
+  creditsCost: integer('credits_cost').notNull().default(0),
+  status: text('status').notNull().default('scheduled'),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxMarketingCampaignsOrg: index('idx_marketing_campaigns_org').on(t.organizationId),
+  idxMarketingCampaignsStatus: index('idx_marketing_campaigns_status').on(t.status),
+}));
+
+// ---------------------------------------------------------------------------
+// SCANNER PAIRING TOKENS
+// ---------------------------------------------------------------------------
+export const scannerPairingTokens = pgTable('scanner_pairing_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  gateId: uuid('gate_id').references(() => checkinGates.id, { onDelete: 'set null' }),
+  pairingCodeHash: text('pairing_code_hash').notNull().unique(),
+  createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  usedByDeviceId: uuid('used_by_device_id').references(() => checkinDevices.id, { onDelete: 'set null' }),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxScannerPairingTokensHash: index('idx_scanner_pairing_tokens_hash').on(t.pairingCodeHash),
+  idxScannerPairingTokensOrg: index('idx_scanner_pairing_tokens_org').on(t.organizationId),
+}));
+
+// ---------------------------------------------------------------------------
+// USER FAVORITES (BOOKMARKS)
+// ---------------------------------------------------------------------------
+export const userFavorites = pgTable('user_favorites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  unqUserFavorite: unique().on(t.userId, t.eventId),
+  idxUserFavoritesUser: index('idx_user_favorites_user').on(t.userId),
+  idxUserFavoritesEvent: index('idx_user_favorites_event').on(t.eventId),
+}));
+
+// ---------------------------------------------------------------------------
+// NEWSLETTER SUBSCRIBERS
+// ---------------------------------------------------------------------------
+export const newsletterSubscribers = pgTable('newsletter_subscribers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: citext('email').notNull().unique(),
+  source: text('source').notNull().default('consumer-web'),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxNewsletterSubscribersEmail: index('idx_newsletter_subscribers_email').on(t.email),
+}));
+
+// ---------------------------------------------------------------------------
+// WHATSAPP BROADCAST TEMPLATES
+// ---------------------------------------------------------------------------
+export const whatsappTemplates = pgTable('whatsapp_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  category: text('category').notNull().default('marketing'),
+  language: text('language').notNull().default('en'),
+  body: text('body').notNull(),
+  headerText: text('header_text'),
+  buttonUrl: text('button_url'),
+  status: text('status').notNull().default('submitted'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxWhatsappTemplatesOrg: index('idx_whatsapp_templates_org').on(t.organizationId),
+}));
 
 // Indexes are defined inline within table definitions using the third argument.
 // See table definitions above for all index declarations.

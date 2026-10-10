@@ -32,6 +32,9 @@ describe('SettlementsService — Net Settlement Calculation & Segregation Suite'
             { amountMinor: 5000, createdAt: new Date() },
           ]),
         },
+        events: {
+          findMany: jest.fn().mockResolvedValue([{ id: 'evt-1' }]),
+        },
       },
       insert: jest.fn().mockReturnValue({
         values: jest.fn().mockReturnValue({

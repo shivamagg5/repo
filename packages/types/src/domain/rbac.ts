@@ -17,6 +17,9 @@ export const PERMISSIONS = {
   ORG_CREATE: 'organization.create',
   ORG_EDIT: 'organization.edit',
   ORG_DELETE: 'organization.delete',
+  ORG_KYB_REVIEW: 'organization.kyb.review',
+  ORG_STATUS_MANAGE: 'organization.status.manage',
+  ORG_COMMISSION_MANAGE: 'organization.commission.manage',
 
   // Members
   MEMBER_INVITE: 'member.invite',
@@ -29,6 +32,7 @@ export const PERMISSIONS = {
   EVENT_PUBLISH: 'event.publish',
   EVENT_CANCEL: 'event.cancel',
   EVENT_VIEW_ANALYTICS: 'event.view_analytics',
+  EVENT_REVIEW: 'event.review',
   EVENT_APPROVE: 'event.approve',
   EVENT_REJECT: 'event.reject',
   EVENT_SUSPEND: 'event.suspend',
@@ -46,6 +50,7 @@ export const PERMISSIONS = {
   TICKET_VOID: 'ticket.void',
   TICKET_REFUND: 'ticket.refund',
   TICKET_TRANSFER: 'ticket.transfer',
+  TICKET_ISSUE: 'ticket.issue',
 
   // Orders
   ORDER_VIEW: 'order.view',
@@ -55,6 +60,11 @@ export const PERMISSIONS = {
   FINANCE_VIEW: 'finance.view',
   SETTLEMENT_VIEW: 'settlement.view',
   SETTLEMENT_APPROVE: 'settlement.approve',
+  SETTLEMENT_DISBURSE: 'settlement.disburse',
+
+  // Marketing
+  MARKETING_CREDITS_GRANT: 'marketing.credits.grant',
+  MARKETING_CAMPAIGN_MODERATE: 'marketing.campaign.moderate',
 
   // Scanner
   SCANNER_USE: 'scanner.use',
@@ -63,6 +73,8 @@ export const PERMISSIONS = {
   // Promoter
   PROMOTER_CREATE_CAMPAIGN: 'promoter.create_campaign',
   PROMOTER_VIEW_EARNINGS: 'promoter.view_earnings',
+  PROMOTER_STATUS_MANAGE: 'promoter.status.manage',
+  PROMOTER_PAYOUT_PROCESS: 'promoter.payout.process',
 
   // CMS
   CMS_MANAGE: 'cms.manage',
@@ -73,6 +85,8 @@ export const PERMISSIONS = {
 
   // Admin — platform-level only
   ADMIN_USERS_MANAGE: 'admin.users.manage',
+  USER_VIEW: 'user.view',
+  USER_MANAGE: 'user.manage',
   USER_SUSPEND: 'user.suspend',
   USER_RESTORE: 'user.restore',
   ADMIN_ROLES: 'admin.roles',

@@ -5,7 +5,9 @@ import { AdminService } from './admin.service';
 import { UsersModule } from '../users/users.module';
 import { EventsModule } from '../events/events.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { AuditModule } from '../../common/audit/audit.module';
+import { FinanceModule } from '../finance/finance.module';
 
 /**
  * Admin Module — platform-level administrative operations and governance.
@@ -18,7 +20,7 @@ import { AuditModule } from '../../common/audit/audit.module';
  * belong exclusively to AdminUsersController to avoid NestJS route conflicts.
  */
 @Module({
-  imports: [UsersModule, EventsModule, PaymentsModule, AuditModule],
+  imports: [UsersModule, EventsModule, PaymentsModule, ScannerModule, AuditModule, FinanceModule],
   controllers: [AdminController, AdminUsersController],
   providers: [AdminService],
   exports: [AdminService],

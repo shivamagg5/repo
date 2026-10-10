@@ -140,10 +140,17 @@ export default function TicketWalletPage() {
                   </div>
 
                   <h3 className="text-xl font-bold text-white mb-1 group-hover:text-purple-300 transition-colors font-['Outfit']">
-                    Standard Admission Pass
+                    {tkt.ticketTypeName || tkt.tierName || tkt.eventTitle || 'Standard Admission Pass'}
                   </h3>
+                  {tkt.eventTitle && (
+                    <p className="text-sm font-medium text-purple-300/90 mb-1 font-['Inter']">
+                      {tkt.eventTitle} {tkt.venueName ? `· ${tkt.venueName}` : ''}
+                    </p>
+                  )}
                   <p className="text-xs text-[var(--color-text-muted)] mb-6 font-['Inter']">
-                    Issued on {new Date(tkt.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {tkt.eventStartsAt
+                      ? `Event: ${new Date(tkt.eventStartsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : `Issued on ${new Date(tkt.issuedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`}
                   </p>
                 </div>
 

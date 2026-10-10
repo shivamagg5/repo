@@ -7,6 +7,19 @@ describe('AnalyticsService — Non-Authoritative Ingestion & Taxonomy Suite', ()
   let mockDatabaseService: any;
 
   beforeEach(() => {
+    // Queue of results for sequential select().from().where() calls.
+    // getOrganizerAnalytics now makes multiple sequential select calls.
+    const selectResults: any[][] = [
+      [{ id: 'ev-org-1' }, { id: 'ev-org-2' }],  // 1st: events → org event IDs
+      [{ totalMinor: 50000 }, { totalMinor: 30000 }], // 2nd: orders → revenue rows
+      [{ count: 2 }],   // 3rd: tickets count
+      [{ count: 2 }],   // 4th: checkins count
+      [{ count: 10 }],  // 5th+: analytics events (views)
+      [{ count: 2 }],   // 6th: analytics events (payments)
+      [{ count: 10 }],  // default
+    ];
+    let selectCallIdx = 0;
+
     mockDb = {
       query: {
         analyticsEvents: {
@@ -32,11 +45,15 @@ describe('AnalyticsService — Non-Authoritative Ingestion & Taxonomy Suite', ()
           ]),
         })),
       })),
-      select: jest.fn().mockImplementation(() => ({
-        from: jest.fn().mockImplementation(() => ({
-          where: jest.fn().mockResolvedValue([{ count: 10 }]),
-        })),
-      })),
+      select: jest.fn().mockImplementation(() => {
+        const result = selectResults[selectCallIdx] ?? [{ count: 10 }];
+        selectCallIdx++;
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(result),
+          }),
+        };
+      }),
     };
 
     mockDatabaseService = { db: mockDb };

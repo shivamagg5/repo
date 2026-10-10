@@ -1,4 +1,8 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { AdminModule } from '../admin/admin.module';
+import { AuditModule } from '../../common/audit/audit.module';
+import { SupportController } from './support.controller';
+import { SupportService } from './support.service';
 
 /**
  * Support Module
@@ -19,8 +23,9 @@
  * - Support/Moderation/Admin: Task 8.x / 9.x
  */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [AdminModule, AuditModule],
+  controllers: [SupportController],
+  providers: [SupportService],
+  exports: [SupportService],
 })
 export class SupportModule {}

@@ -185,3 +185,12 @@ export interface CmsEditorialBlockDto {
   status: CmsContentStatus;
   createdAt: string;
 }
+
+export interface CreateCmsEditorialBlockInput {
+  blockType: string;
+  headline: string;
+  bodyMarkdown: string;
+  mediaUrl?: string;
+  displayOrder?: number;
+  status?: CmsContentStatus;
+}

@@ -202,8 +202,20 @@ function EventsContent() {
           ))}
         </div>
 
+        {/* Sort Dropdown */}
+        <select
+          value={sortParam}
+          onChange={(e) => updateFilters({ sort: e.target.value === 'date' ? null : e.target.value })}
+          className="bg-[var(--color-surface)] text-xs font-semibold text-white px-3.5 py-2.5 rounded-xl border border-[var(--color-border)] focus:outline-none focus:border-purple-500"
+        >
+          <option value="date">Sort: Upcoming First</option>
+          <option value="popularity">Sort: Most Popular</option>
+          <option value="price_asc">Sort: Price (Low → High)</option>
+          <option value="price_desc">Sort: Price (High → Low)</option>
+        </select>
+
         {/* Clear Filters */}
-        {(categoryParam || cityParam || datePresetParam || qParam) && (
+        {(categoryParam || cityParam || datePresetParam || qParam || (sortParam && sortParam !== 'date')) && (
           <button
             type="button"
             onClick={() => router.push('/events')}

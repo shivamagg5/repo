@@ -6,7 +6,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
 import {
   events,
@@ -15,6 +15,7 @@ import {
   eventLineups,
   venues,
   ticketTypes,
+  newsletterSubscribers,
 } from '../../database/schema/index';
 import { AuditService } from '../../common/audit/audit.service';
 import { RbacService } from '../auth/rbac.service';
@@ -546,6 +547,24 @@ export class EventsService {
       }
     }
 
+    // Fetch min ticket price for active tiers
+    const minPriceMap = new Map<string, number>();
+    if (eventIds.length > 0) {
+      const activeTiers = await this.db.db
+        .select({
+          eventId: ticketTypes.eventId,
+          minPrice: sql<number>`MIN(${ticketTypes.priceMinor})`,
+        })
+        .from(ticketTypes)
+        .where(and(inArray(ticketTypes.eventId, eventIds), eq(ticketTypes.status, 'active')))
+        .groupBy(ticketTypes.eventId)
+        .execute();
+
+      for (const t of activeTiers) {
+        minPriceMap.set(t.eventId, Number(t.minPrice));
+      }
+    }
+
     const dtos: EventListItemDto[] = items.map(({ event, venueName, venueSlug, venueCity, categoryName, categorySlug }) => ({
       id: event.id,
       title: event.title,
@@ -559,6 +578,7 @@ export class EventsService {
       venueSlug: venueSlug ?? null,
       categoryName: categoryName ?? null,
       categorySlug: categorySlug ?? null,
+      minPriceMinor: minPriceMap.get(event.id),
     }));
 
     let nextCursor: string | null = null;
@@ -590,8 +610,12 @@ export class EventsService {
    * Sanitized — returns EventDetailPublicDto.
    */
   async findPublicEventDetailBySlug(slug: string): Promise<EventDetailPublicDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
     const event = await this.db.db.query.events.findFirst({
-      where: and(eq(events.slug, slug), inArray(events.status, ['published', 'live'])),
+      where: and(
+        isUuid ? or(eq(events.id, slug), eq(events.slug, slug)) : eq(events.slug, slug),
+        inArray(events.status, ['published', 'live']),
+      ),
     });
 
     if (!event) {
@@ -712,6 +736,38 @@ export class EventsService {
       .from(eventCategories)
       .where(eq(eventCategories.status, 'active'))
       .execute();
+  }
+
+  /**
+   * List distinct cities with active event venues.
+   */
+  async listCities(): Promise<Array<{ name: string; state: string | null; country: string }>> {
+    const raw = await this.db.db
+      .selectDistinct({
+        name: venues.city,
+        state: venues.state,
+        country: venues.country,
+      })
+      .from(venues)
+      .where(and(eq(venues.status, 'active'), isNotNull(venues.city)))
+      .execute();
+
+    if (raw.length === 0) {
+      return [
+        { name: 'Mumbai', state: 'Maharashtra', country: 'IN' },
+        { name: 'Bengaluru', state: 'Karnataka', country: 'IN' },
+        { name: 'Delhi NCR', state: 'Delhi', country: 'IN' },
+        { name: 'Goa', state: 'Goa', country: 'IN' },
+        { name: 'Pune', state: 'Maharashtra', country: 'IN' },
+        { name: 'Hyderabad', state: 'Telangana', country: 'IN' },
+      ];
+    }
+
+    return raw.map((r) => ({
+      name: r.name!,
+      state: r.state,
+      country: r.country ?? 'IN',
+    }));
   }
 
   /**
@@ -889,4 +945,30 @@ export class EventsService {
       })),
     };
   }
+
+  /**
+   * Subscribe an email to VIP event drops & platform newsletter.
+   */
+  async subscribeNewsletter(email: string, source = 'consumer-web') {
+    const normalized = (email ?? '').trim().toLowerCase();
+    if (!normalized || !normalized.includes('@') || !normalized.includes('.')) {
+      throw new BadRequestException({ code: 'INVALID_EMAIL', message: 'Valid email address is required.' });
+    }
+
+    await this.db.db
+      .insert(newsletterSubscribers)
+      .values({
+        email: normalized,
+        source,
+        status: 'active',
+      })
+      .onConflictDoUpdate({
+        target: newsletterSubscribers.email,
+        set: { status: 'active', updatedAt: new Date() },
+      })
+      .execute();
+
+    return { success: true, message: 'Subscribed to VIP event drops successfully.' };
+  }
 }
+

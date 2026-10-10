@@ -77,18 +77,26 @@ export class NotificationOutboxService {
   }
 
   /**
-   * OUTBOX WORKER CONCURRENCY (FOR UPDATE SKIP LOCKED / STALE LOCK CLAIM)
+   * OUTBOX WORKER CONCURRENCY (FOR UPDATE SKIP LOCKED / STALE LOCK CLAIM / RETRY BACKOFF)
    */
   async claimOutboxEvents(workerId: string, limit = 10) {
     const db = this.databaseService.db;
     const now = new Date();
     const staleLockCutoff = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes stale lock
 
-    // Find pending or stale processing outbox items
+    // Find pending, failed (with backoff passed and retries remaining), or stale processing items
     const claimable = await db.query.notificationOutbox.findMany({
       where: and(
         or(
           eq(notificationOutbox.status, 'pending'),
+          and(
+            eq(notificationOutbox.status, 'failed'),
+            lt(notificationOutbox.retryCount, 5),
+            or(
+              isNull(notificationOutbox.nextAttemptAt),
+              lt(notificationOutbox.nextAttemptAt, now),
+            ),
+          ),
           and(
             eq(notificationOutbox.status, 'processing'),
             lt(notificationOutbox.lockedAt, staleLockCutoff),
@@ -112,6 +120,7 @@ export class NotificationOutboxService {
             eq(notificationOutbox.id, item.id),
             or(
               eq(notificationOutbox.status, 'pending'),
+              eq(notificationOutbox.status, 'failed'),
               and(
                 eq(notificationOutbox.status, 'processing'),
                 lt(notificationOutbox.lockedAt, staleLockCutoff),
@@ -203,12 +212,17 @@ export class NotificationOutboxService {
           .where(eq(notificationOutbox.id, item.id));
       } catch (err: any) {
         this.logger.error(`Failed to process outbox item ${item.id}: ${err.message}`);
+        const nextRetry = (item.retryCount ?? 0) + 1;
+        const delayMs = Math.min(Math.pow(2, nextRetry) * 1000, 60000);
+        const nextAttemptAt = new Date(Date.now() + delayMs);
+
         await db
           .update(notificationOutbox)
           .set({
-            status: 'failed',
+            status: nextRetry >= 5 ? 'dead_letter' : 'failed',
             lastError: err.message,
-            retryCount: item.retryCount + 1,
+            retryCount: nextRetry,
+            nextAttemptAt,
             lockedAt: null,
             lockedBy: null,
           })
@@ -299,5 +313,100 @@ export class NotificationOutboxService {
         .set({ active: false })
         .where(eq(deviceTokens.token, recipient));
     }
+  }
+
+  /**
+   * RECORD INCOMING PROVIDER WEBHOOK DELIVERY EVENT (RESEND, SENDGRID, TWILIO, FCM)
+   */
+  async recordProviderWebhookDelivery(provider: string, body: any): Promise<{ status: string; updatedCount: number }> {
+    const db = this.databaseService.db;
+    const eventsToProcess: Array<{ messageId: string; status: string; failureReason?: string }> = [];
+
+    const norm = provider.toLowerCase();
+    if (norm.includes('resend')) {
+      const type = body?.type || '';
+      const messageId = body?.data?.email_id || body?.data?.id || body?.id;
+      if (messageId) {
+        let status = 'processed';
+        if (type.includes('delivered')) status = 'delivered';
+        else if (type.includes('bounced')) status = 'bounced';
+        else if (type.includes('complained')) status = 'complained';
+        else if (type.includes('delayed')) status = 'delayed';
+        eventsToProcess.push({ messageId, status, failureReason: body?.data?.rejection_reason });
+      }
+    } else if (norm.includes('sendgrid')) {
+      const items = Array.isArray(body) ? body : [body];
+      for (const item of items) {
+        const rawId = item?.sg_message_id || item?.message_id;
+        if (rawId) {
+          const messageId = rawId.split('.')[0]; // strip SendGrid filter suffix
+          const ev = (item?.event || '').toLowerCase();
+          let status = 'processed';
+          if (ev === 'delivered') status = 'delivered';
+          else if (ev === 'bounce' || ev === 'dropped') status = 'bounced';
+          else if (ev === 'deferred') status = 'delayed';
+          eventsToProcess.push({ messageId, status, failureReason: item?.reason });
+        }
+      }
+    } else if (norm.includes('twilio')) {
+      const messageId = body?.MessageSid || body?.messageSid;
+      if (messageId) {
+        const ev = (body?.MessageStatus || '').toLowerCase();
+        let status = 'processed';
+        if (ev === 'delivered') status = 'delivered';
+        else if (ev === 'failed' || ev === 'undelivered') status = 'failed';
+        eventsToProcess.push({ messageId, status, failureReason: body?.ErrorMessage });
+      }
+    } else {
+      // Generic provider
+      const messageId = body?.providerMessageId || body?.messageId || body?.id;
+      if (messageId) {
+        eventsToProcess.push({
+          messageId,
+          status: body?.status || 'delivered',
+          failureReason: body?.failureReason || body?.reason,
+        });
+      }
+    }
+
+    let updatedCount = 0;
+    for (const ev of eventsToProcess) {
+      const log = await db.query.notificationLogs.findFirst({
+        where: eq(notificationLogs.providerMessageId, ev.messageId),
+      });
+
+      if (log) {
+        await db
+          .update(notificationLogs)
+          .set({
+            status: ev.status,
+            failureReason: ev.failureReason || log.failureReason,
+          })
+          .where(eq(notificationLogs.id, log.id));
+
+        await db.insert(notificationDeliveryAttempts).values({
+          logId: log.id,
+          attemptNumber: (log.retryCount ?? 0) + 1,
+          provider,
+          providerMessageId: ev.messageId,
+          status: ev.status,
+          failureReason: ev.failureReason ?? null,
+          startedAt: new Date(),
+          completedAt: new Date(),
+        });
+
+        if (ev.status === 'bounced' && log.channel === 'push') {
+          await db
+            .update(deviceTokens)
+            .set({ active: false })
+            .where(eq(deviceTokens.token, log.recipient));
+        }
+
+        updatedCount++;
+      }
+    }
+
+    this.logger.log(`[NotificationWebhook] Processed ${eventsToProcess.length} events from ${provider}, updated ${updatedCount} logs.`);
+    return { status: 'processed', updatedCount };
   }
 }

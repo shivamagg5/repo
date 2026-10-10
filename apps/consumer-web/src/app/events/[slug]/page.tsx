@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Navbar } from '../../../components/Navbar';
 import { Footer } from '../../../components/Footer';
 import { TicketSelector } from '../../../components/tickets/TicketSelector';
+import { ShareEventButton } from '../../../components/ShareEventButton';
 import { Badge } from '@platform/ui';
 import type { EventDetailPublicDto, TicketType } from '@platform/types';
 
@@ -350,6 +351,9 @@ export default async function EventDetailPage({
             <Badge variant="success" size="md" dot>
               Verified Experience
             </Badge>
+            <div className="ml-auto">
+              <ShareEventButton title={event.title} />
+            </div>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4 leading-tight font-['Outfit']">
@@ -371,9 +375,19 @@ export default async function EventDetailPage({
               <div>
                 <strong className="block text-white font-semibold">Location & Venue</strong>
                 {event.venue ? (
-                  <Link href={`/venues/${event.venue.slug}`} className="text-purple-400 hover:underline font-medium">
-                    {event.venue.name} ({event.venue.city})
-                  </Link>
+                  <div className="space-y-1">
+                    <Link href={`/venues/${event.venue.slug}`} className="text-purple-400 hover:underline font-medium block">
+                      {event.venue.name} ({event.venue.city})
+                    </Link>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue.name} ${event.venue.address || ''} ${event.venue.city || ''}`.trim())}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                    >
+                      🗺️ Open in Google Maps ↗
+                    </a>
+                  </div>
                 ) : (
                   <span>Venue TBD</span>
                 )}
@@ -420,7 +434,13 @@ export default async function EventDetailPage({
 
           {/* Right Column (1/3): Interactive Ticket Selector */}
           <div id="tickets-section">
-            <TicketSelector eventId={event.id} ticketTypes={ticketTypes} />
+            <TicketSelector
+              eventId={event.id}
+              eventName={event.title}
+              ticketTypes={ticketTypes}
+              venueName={event.venue?.name}
+              isHighDemand={Boolean(event.slug?.includes('neon') || (event.venue?.capacity && event.venue.capacity >= 10000))}
+            />
           </div>
 
         </div>

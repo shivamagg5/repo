@@ -9,6 +9,10 @@ import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PromotersModule } from '../promoters/promoters.module';
 
+import { OrganizerMarketingService } from './organizer-marketing.service';
+import { OrganizerDataService } from './organizer-data.service';
+import { OrganizerPayoutService } from './organizer-payout.service';
+
 @Module({
   imports: [
     AuthModule,
@@ -20,7 +24,17 @@ import { PromotersModule } from '../promoters/promoters.module';
     PromotersModule,
   ],
   controllers: [OrganizerDashboardController],
-  providers: [OrganizerDashboardService],
-  exports: [OrganizerDashboardService],
+  providers: [
+    OrganizerDashboardService,
+    OrganizerMarketingService,
+    OrganizerDataService,
+    OrganizerPayoutService,
+  ],
+  exports: [
+    OrganizerDashboardService,
+    OrganizerMarketingService,
+    OrganizerDataService,
+    OrganizerPayoutService,
+  ],
 })
 export class OrganizerDashboardModule {}

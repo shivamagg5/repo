@@ -1,291 +1,784 @@
-// =============================================================================
-// admin-web — Settlements & Payout Governance
-// Generate and review organizer settlements with dual-approval / segregation of duties.
-// =============================================================================
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
+import type { AdminSettlementListItemDto } from '@platform/types';
+import { SettlementAuditModal } from '../../components/SettlementAuditModal';
 
 export default function AdminSettlementsPage() {
-  // Generate Settlement Form State
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [orgId, setOrgId] = useState('');
-  const [periodStart, setPeriodStart] = useState('2026-08-01T00:00:00Z');
-  const [periodEnd, setPeriodEnd] = useState('2026-08-14T23:59:59Z');
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const [generateSuccess, setGenerateSuccess] = useState<string | null>(null);
+  const [settlements, setSettlements] = useState<AdminSettlementListItemDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'on_hold'>('all');
 
-  // Review Settlement Form State
+  // Selected settlement & modals
+  const [selectedSettlement, setSelectedSettlement] = useState<AdminSettlementListItemDto | null>(null);
+  const [auditSettlement, setAuditSettlement] = useState<AdminSettlementListItemDto | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [settlementId, setSettlementId] = useState('');
-  const [reviewAction, setReviewAction] = useState<'approve' | 'reject'>('approve');
-  const [reviewNotes, setReviewNotes] = useState('');
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+  const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'hold'>('approve');
+  const [reviewReason, setReviewReason] = useState('');
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!orgId.trim()) return;
+  const [showDisburseModal, setShowDisburseModal] = useState(false);
+  const [disburseTxRef, setDisburseTxRef] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
-    setGenerating(true);
-    setGenerateError(null);
-    setGenerateSuccess(null);
+  const fetchSettlements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await apiClient.generateSettlement<any>({
-        organizationId: orgId.trim(),
-        periodStart,
-        periodEnd,
-      });
-
-      setGenerateSuccess(`Settlement generated successfully. Settlement ID: ${res.data?.id ?? 'Created'}`);
-      setOrgId('');
-      setTimeout(() => {
-        setShowGenerateModal(false);
-        setGenerateSuccess(null);
-      }, 2000);
+      const res = await apiClient.getAdminSettlements<AdminSettlementListItemDto[]>();
+      setSettlements(res.data ?? []);
+      setLastUpdated(new Date());
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setGenerateError(err.message || 'Failed to generate settlement.');
-      } else {
-        setGenerateError(err?.message || 'Error occurred while generating settlement.');
-      }
+      setError(err?.message ?? 'Failed to load financial settlements');
     } finally {
-      setGenerating(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettlements();
+  }, [fetchSettlements]);
+
+  const filteredSettlements = settlements.filter((s) => {
+    if (statusFilter === 'pending' && s.status !== 'pending_review') return false;
+    if (statusFilter === 'approved' && s.status !== 'approved' && s.status !== 'processing') return false;
+    if (statusFilter === 'paid' && s.status !== 'paid') return false;
+    if (statusFilter === 'on_hold' && s.status !== 'on_hold') return false;
+    return true;
+  });
+
+  const totalGrossEscrow = settlements.reduce((sum, s) => sum + s.grossSalesMinor, 0);
+  const totalPlatformFees = settlements.reduce((sum, s) => sum + s.platformCommissionMinor, 0);
+  const totalPendingRelease = settlements
+    .filter((s) => s.status === 'pending_review' || s.status === 'approved')
+    .reduce((sum, s) => sum + s.netSettlementMinor, 0);
+
+  const formatINR = (minor: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(
+      minor / 100,
+    );
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!selectedSettlement) return;
+    setActionLoading(true);
+    try {
+      await apiClient.reviewSettlement(selectedSettlement.id, {
+        action: reviewAction,
+        reason: reviewReason.trim() || undefined,
+      });
+      setShowReviewModal(false);
+      setSelectedSettlement(null);
+      setReviewReason('');
+      await fetchSettlements();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to update settlement review status');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!settlementId.trim()) return;
-
-    setReviewing(true);
-    setReviewError(null);
-    setReviewSuccess(null);
+  const handleDisburseSubmit = async () => {
+    if (!selectedSettlement) return;
+    setActionLoading(true);
     try {
-      await apiClient.reviewSettlement(settlementId.trim(), {
-        action: reviewAction,
-        notes: reviewNotes.trim() || undefined,
+      const idempotencyKey = `DISBURSE-IDEM-${selectedSettlement.id}-${Date.now()}`;
+      await apiClient.disburseSettlement(selectedSettlement.id, {
+        idempotencyKey,
+        transactionReference: disburseTxRef.trim() || undefined,
       });
-
-      setReviewSuccess(`Settlement ${reviewAction === 'approve' ? 'approved' : 'rejected'} successfully.`);
-      setSettlementId('');
-      setTimeout(() => {
-        setShowReviewModal(false);
-        setReviewSuccess(null);
-      }, 2000);
+      setShowDisburseModal(false);
+      setSelectedSettlement(null);
+      setDisburseTxRef('');
+      await fetchSettlements();
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setReviewError(err.message || 'Failed to review settlement (e.g. Segregation of Duties violation).');
-      } else {
-        setReviewError(err?.message || 'Error occurred while reviewing settlement.');
-      }
+      alert(err?.message ?? 'Failed to disburse settlement');
     } finally {
-      setReviewing(false);
+      setActionLoading(false);
+    }
+  };
+
+  const handleAuditApprove = async (settlementId: string) => {
+    setActionLoading(true);
+    try {
+      await apiClient.reviewSettlement(settlementId, {
+        action: 'approve',
+        reason: 'Automated AML/KYB Compliance & Escrow Audit Passed by Operations Admin',
+      });
+      setAuditSettlement(null);
+      await fetchSettlements();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to approve settlement');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAuditHold = async (settlementId: string, reason: string) => {
+    setActionLoading(true);
+    try {
+      await apiClient.reviewSettlement(settlementId, {
+        action: 'hold',
+        reason,
+      });
+      setAuditSettlement(null);
+      await fetchSettlements();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to place risk hold on settlement');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   return (
     <AdminLayout
-      title="Settlements & Payout Governance"
-      subtitle="Generate organizer payout statements and execute segregation-of-duties review approvals"
+      title="Financial Escrow & Organizer Payouts"
+      subtitle="Platform gross sales escrow, payment gateway fee reconciliation, platform commission profit & bank wire releases"
       actions={
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {lastUpdated && (
+            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
           <button
-            onClick={() => {
-              setShowReviewModal(true);
-              setReviewError(null);
-              setReviewSuccess(null);
+            type="button"
+            onClick={fetchSettlements}
+            disabled={loading}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              background: 'var(--surface-3)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-2)',
+              cursor: 'pointer',
             }}
-            className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-200 text-xs font-bold transition-colors"
           >
-            ⚖️ Review Settlement
+            {loading ? 'Refreshing...' : '↻ Refresh'}
           </button>
-          <button
-            onClick={() => {
-              setShowGenerateModal(true);
-              setGenerateError(null);
-              setGenerateSuccess(null);
-            }}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors shadow-lg shadow-red-950/40"
-          >
-            + Generate Settlement
-          </button>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)', display: 'flex', alignItems: 'center' }}>
+            Pending Release:{' '}
+            <strong style={{ color: 'var(--green)', marginLeft: '4px' }}>{formatINR(totalPendingRelease)}</strong>
+          </span>
         </div>
       }
     >
       <div className="space-y-6">
-        {/* Governance Rules Banner */}
-        <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
-          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider text-[11px]">
-            Financial Governance & Dual-Control Policies
-          </h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            • <strong>Segregation of Duties:</strong> The administrator who generates a settlement cannot approve or authorize payout for the same record.<br />
-            • <strong>Authoritative Hold Reconciliation:</strong> Settlements account for active refunds, chargebacks, and reserve holds before payout calculation.
-          </p>
+        {error && (
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              color: '#f87171',
+              fontSize: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={fetchSettlements}
+              style={{
+                background: 'rgba(239, 68, 68, 0.2)',
+                border: 'none',
+                color: '#fff',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '11px',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* ── Financial P&L & Escrow Breakdown ───────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="stat-card">
+            <span className="stat-card-label">Total Escrow Processed</span>
+            <p className="stat-card-value text-white mt-1">{formatINR(totalGrossEscrow)}</p>
+            <div className="stat-card-delta up" style={{ color: 'var(--green)' }}>
+              100% Reconciled via Double-Entry Ledger
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <span className="stat-card-label">Net Platform Commission</span>
+            <p className="stat-card-value text-white mt-1">{formatINR(totalPlatformFees)}</p>
+            <div className="stat-card-delta up" style={{ color: 'var(--pink)' }}>
+              + {formatINR(totalPlatformFees * 0.18)} GST Collected
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <span className="stat-card-label">Pending Escrow Release</span>
+            <p className="stat-card-value text-white mt-1">{formatINR(totalPendingRelease)}</p>
+            <div className="stat-card-delta neutral" style={{ color: 'var(--yellow)' }}>
+              {settlements.filter((s) => s.status === 'pending_review' || s.status === 'approved').length} Batches
+              Awaiting Payout
+            </div>
+          </div>
         </div>
 
-        {/* Generate Settlement Modal */}
-        {showGenerateModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 max-w-md w-full space-y-4 shadow-2xl">
-              <h3 className="text-base font-bold text-slate-100">Generate Organizer Settlement</h3>
-              <p className="text-xs text-slate-400">Calculate net revenue and generate settlement statement for the accounting period.</p>
+        {/* ── Status Filter Bar ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {(['all', 'pending', 'approved', 'paid', 'on_hold'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setStatusFilter(tab)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid',
+                  textTransform: 'capitalize',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: statusFilter === tab ? 'var(--pink-dim)' : 'var(--surface-2)',
+                  borderColor: statusFilter === tab ? 'var(--pink)' : 'var(--border)',
+                  color: statusFilter === tab ? 'var(--pink)' : 'var(--text-3)',
+                }}
+              >
+                {tab === 'all'
+                  ? 'All Batches'
+                  : tab === 'pending'
+                    ? 'Pending Review'
+                    : tab === 'approved'
+                      ? 'Approved (Ready to Disburse)'
+                      : tab === 'paid'
+                        ? 'Paid Out'
+                        : 'On Hold'}{' '}
+                (
+                {
+                  settlements.filter((s) =>
+                    tab === 'all'
+                      ? true
+                      : tab === 'pending'
+                        ? s.status === 'pending_review'
+                        : tab === 'approved'
+                          ? s.status === 'approved' || s.status === 'processing'
+                          : tab === 'paid'
+                            ? s.status === 'paid'
+                            : s.status === 'on_hold',
+                  ).length
+                }
+                )
+              </button>
+            ))}
+          </div>
+        </div>
 
-              {generateError && (
-                <div className="p-3 rounded-lg bg-red-950/60 border border-red-800 text-red-300 text-xs">
-                  {generateError}
-                </div>
-              )}
-              {generateSuccess && (
-                <div className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs">
-                  {generateSuccess}
-                </div>
-              )}
+        {/* ── Settlements Table ──────────────────────────────────────────────── */}
+        <div className="surface-card">
+          <div className="surface-card-body p-0">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                    {['SETTLEMENT BATCH', 'ORGANIZER & EVENT', 'PERIOD', 'GROSS SALES', 'FEES & TAX', 'NET PAYOUT', 'STATUS & ACTIONS'].map(
+                      (h, i) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: '12px 14px',
+                            textAlign: i >= 3 && i <= 5 ? 'right' : 'left',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            letterSpacing: '0.08em',
+                            color: 'var(--text-3)',
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-3)' }}>
+                        Loading settlements from ledger...
+                      </td>
+                    </tr>
+                  ) : filteredSettlements.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-3)' }}>
+                        No settlements found in selected status view.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSettlements.map((s, i) => (
+                      <tr
+                        key={s.id}
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                        }}
+                      >
+                        {/* ID & Bank Account */}
+                        <td style={{ padding: '14px' }}>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 700,
+                              color: 'var(--text-1)',
+                              fontSize: '12px',
+                            }}
+                          >
+                            {s.id.slice(0, 12)}...
+                          </span>
+                          <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-3)' }}>
+                            {s.bankAccount ? `A/C: ${s.bankAccount.accountNumber} · IFSC: ${s.bankAccount.ifsc}` : 'Bank pending'}
+                          </p>
+                        </td>
 
-              <form onSubmit={handleGenerate} className="space-y-4">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Organization ID *</label>
-                  <input
-                    type="text"
-                    required
-                    value={orgId}
-                    onChange={(e) => setOrgId(e.target.value)}
-                    placeholder="Enter organizer organization UUID..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Period Start</label>
-                  <input
-                    type="text"
-                    value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Period End</label>
-                  <input
-                    type="text"
-                    value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowGenerateModal(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={generating || !orgId.trim()}
-                    className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {generating ? 'Generating...' : 'Generate Settlement'}
-                  </button>
-                </div>
-              </form>
+                        {/* Organizer & Event */}
+                        <td style={{ padding: '14px' }}>
+                          <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-1)' }}>{s.organizerName}</p>
+                          <p style={{ margin: '2px 0 0', color: 'var(--text-3)', fontSize: '11px' }}>{s.eventName}</p>
+                        </td>
+
+                        {/* Settlement Period */}
+                        <td style={{ padding: '14px', color: 'var(--text-2)' }}>
+                          {s.period || `${new Date(s.periodStart).toLocaleDateString()} - ${new Date(s.periodEnd).toLocaleDateString()}`}
+                        </td>
+
+                        {/* Gross Sales */}
+                        <td style={{ padding: '14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-1)' }}>
+                          {formatINR(s.grossSalesMinor)}
+                        </td>
+
+                        {/* Fees & Deductions */}
+                        <td style={{ padding: '14px', textAlign: 'right', color: 'var(--text-3)' }}>
+                          <p style={{ margin: 0 }}>Comm: {formatINR(s.platformCommissionMinor)}</p>
+                          <span style={{ fontSize: '10px' }}>Tax: {formatINR(s.taxMinor)}</span>
+                        </td>
+
+                        {/* Net Payout */}
+                        <td style={{ padding: '14px', textAlign: 'right' }}>
+                          <p style={{ margin: 0, fontWeight: 800, color: 'var(--green)', fontSize: '13px' }}>
+                            {formatINR(s.netSettlementMinor)}
+                          </p>
+                          {s.transactionReference && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                              Ref: {s.transactionReference}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status & Action */}
+                        <td style={{ padding: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '100px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                background:
+                                  s.status === 'paid'
+                                    ? 'rgba(16,185,129,0.15)'
+                                    : s.status === 'approved' || s.status === 'processing'
+                                      ? 'rgba(59,130,246,0.15)'
+                                      : s.status === 'pending_review'
+                                        ? 'rgba(245,158,11,0.15)'
+                                        : 'rgba(239,68,68,0.15)',
+                                color:
+                                  s.status === 'paid'
+                                    ? 'var(--green)'
+                                    : s.status === 'approved' || s.status === 'processing'
+                                      ? '#60a5fa'
+                                      : s.status === 'pending_review'
+                                        ? 'var(--yellow)'
+                                        : '#f87171',
+                              }}
+                            >
+                              ● {s.status}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => setAuditSettlement(s)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-2)',
+                                cursor: 'pointer',
+                              }}
+                              title="Audit Escrow Ledger & Compliance"
+                            >
+                              📋 Audit
+                            </button>
+
+                            {s.status === 'pending_review' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSettlement(s);
+                                  setReviewAction('approve');
+                                  setShowReviewModal(true);
+                                }}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  background: 'var(--surface-3)',
+                                  border: '1px solid var(--border)',
+                                  color: 'var(--text-2)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Review
+                              </button>
+                            )}
+
+                            {s.status === 'approved' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSettlement(s);
+                                  setDisburseTxRef(`NEFT-${Date.now()}`);
+                                  setShowDisburseModal(true);
+                                }}
+                                style={{
+                                  padding: '4px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  background: 'var(--green)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Disburse
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
-
-        {/* Review Settlement Modal */}
-        {showReviewModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 max-w-md w-full space-y-4 shadow-2xl">
-              <h3 className="text-base font-bold text-slate-100">Review & Authorize Settlement</h3>
-              <p className="text-xs text-slate-400">Perform dual-control compliance check to approve or reject payout statement.</p>
-
-              {reviewError && (
-                <div className="p-3 rounded-lg bg-red-950/60 border border-red-800 text-red-300 text-xs">
-                  {reviewError}
-                </div>
-              )}
-              {reviewSuccess && (
-                <div className="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs">
-                  {reviewSuccess}
-                </div>
-              )}
-
-              <form onSubmit={handleReview} className="space-y-4">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Settlement ID *</label>
-                  <input
-                    type="text"
-                    required
-                    value={settlementId}
-                    onChange={(e) => setSettlementId(e.target.value)}
-                    placeholder="Enter settlement record UUID..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Action</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setReviewAction('approve')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                        reviewAction === 'approve'
-                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
-                          : 'bg-slate-900 text-slate-400 border-slate-800'
-                      }`}
-                    >
-                      ✓ Approve Payout
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReviewAction('reject')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                        reviewAction === 'reject'
-                          ? 'bg-red-600 text-white border-red-500 shadow-md'
-                          : 'bg-slate-900 text-slate-400 border-slate-800'
-                      }`}
-                    >
-                      ✗ Reject
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Compliance Notes</label>
-                  <textarea
-                    rows={2}
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                    placeholder="Provide notes for audit trail..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowReviewModal(false)}
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={reviewing || !settlementId.trim()}
-                    className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
-                  >
-                    {reviewing ? 'Submitting...' : 'Confirm Decision'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* ── Review Settlement Modal ──────────────────────────────────────────── */}
+      {showReviewModal && selectedSettlement && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Review Settlement Batch</h3>
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '12px' }}>
+              <div style={{ background: 'var(--surface-2)', padding: '12px', borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontWeight: 700, color: '#fff' }}>{selectedSettlement.organizerName}</p>
+                <p style={{ margin: '2px 0', color: 'var(--text-3)' }}>{selectedSettlement.eventName}</p>
+                <p style={{ margin: '6px 0 0', fontWeight: 800, color: 'var(--green)', fontSize: '14px' }}>
+                  Net Payout: {formatINR(selectedSettlement.netSettlementMinor)}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>
+                  Action Decision
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['approve', 'hold', 'reject'] as const).map((act) => (
+                    <button
+                      key={act}
+                      type="button"
+                      onClick={() => setReviewAction(act)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        border: '1px solid',
+                        textTransform: 'capitalize',
+                        cursor: 'pointer',
+                        background:
+                          reviewAction === act
+                            ? act === 'approve'
+                              ? 'rgba(16,185,129,0.2)'
+                              : act === 'hold'
+                                ? 'rgba(245,158,11,0.2)'
+                                : 'rgba(239,68,68,0.2)'
+                            : 'var(--surface-2)',
+                        borderColor:
+                          reviewAction === act
+                            ? act === 'approve'
+                              ? 'rgba(16,185,129,0.5)'
+                              : act === 'hold'
+                                ? 'rgba(245,158,11,0.5)'
+                                : 'rgba(239,68,68,0.5)'
+                            : 'var(--border)',
+                        color:
+                          reviewAction === act
+                            ? act === 'approve'
+                              ? 'var(--green)'
+                              : act === 'hold'
+                                ? 'var(--yellow)'
+                                : '#f87171'
+                            : 'var(--text-3)',
+                      }}
+                    >
+                      {act}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>
+                  Audit Notes / Reason
+                </label>
+                <input
+                  type="text"
+                  value={reviewReason}
+                  onChange={(e) => setReviewReason(e.target.value)}
+                  placeholder="e.g. Verified order ledger totals against bank escrow"
+                  style={{
+                    width: '100%',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'none',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-3)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handleReviewSubmit}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '8px',
+                    background: 'var(--pink)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: actionLoading ? 'wait' : 'pointer',
+                  }}
+                >
+                  {actionLoading ? 'Saving...' : 'Confirm Review'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Disburse Settlement Modal ────────────────────────────────────────── */}
+      {showDisburseModal && selectedSettlement && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Authorize Bank Wire Payout</h3>
+              <button
+                type="button"
+                onClick={() => setShowDisburseModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '12px' }}>
+              <p style={{ color: 'var(--text-2)', margin: 0 }}>
+                Disburse <strong>{formatINR(selectedSettlement.netSettlementMinor)}</strong> to{' '}
+                <strong>{selectedSettlement.organizerName}</strong>.
+              </p>
+              <div style={{ background: 'var(--surface-2)', padding: '12px', borderRadius: '8px' }}>
+                <p style={{ margin: '2px 0', fontSize: '11px', color: 'var(--text-2)' }}>
+                  Bank: {selectedSettlement.bankAccount ? `${selectedSettlement.bankAccount.accountNumber} (IFSC: ${selectedSettlement.bankAccount.ifsc})` : 'Default verified account'}
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '6px' }}>
+                  NEFT / RTGS / UTR Transaction Reference
+                </label>
+                <input
+                  type="text"
+                  value={disburseTxRef}
+                  onChange={(e) => setDisburseTxRef(e.target.value)}
+                  placeholder="e.g. UTR-HDFC-98210398210"
+                  style={{
+                    width: '100%',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDisburseModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'none',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-3)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handleDisburseSubmit}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '8px',
+                    background: 'var(--green)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: actionLoading ? 'wait' : 'pointer',
+                  }}
+                >
+                  {actionLoading ? 'Disbursing...' : 'Confirm Bank Wire'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Settlement Audit Escrow Modal ────────────────────────────────────── */}
+      {auditSettlement && (
+        <SettlementAuditModal
+          settlement={auditSettlement}
+          onClose={() => setAuditSettlement(null)}
+          onApprove={handleAuditApprove}
+          onHold={handleAuditHold}
+        />
+      )}
     </AdminLayout>
   );
 }

@@ -15,8 +15,18 @@ import { RbacGuard } from '../../common/guards/rbac.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SettlementsService } from './settlements.service';
-import { generateSettlementSchema, reviewSettlementSchema } from '@platform/validation';
-import type { AuthContext, GenerateSettlementInput, ReviewSettlementInput } from '@platform/types';
+import {
+  generateSettlementSchema,
+  reviewSettlementSchema,
+  adminDisburseSettlementSchema,
+} from '@platform/validation';
+import { PERMISSIONS } from '@platform/types';
+import type {
+  AuthContext,
+  GenerateSettlementInput,
+  ReviewSettlementInput,
+  DisburseSettlementInput,
+} from '@platform/types';
 
 @Controller('settlements')
 @UseGuards(AuthGuard, RbacGuard)
@@ -25,7 +35,7 @@ export class SettlementsController {
 
   @Post('generate')
   @HttpCode(HttpStatus.OK)
-  @RequirePermissions('finance.view' as any)
+  @RequirePermissions(PERMISSIONS.FINANCE_VIEW)
   async generateSettlement(
     @Body() body: GenerateSettlementInput,
     @CurrentUser() actor: AuthContext,
@@ -36,7 +46,7 @@ export class SettlementsController {
 
   @Post(':id/review')
   @HttpCode(HttpStatus.OK)
-  @RequirePermissions('settlement.approve' as any)
+  @RequirePermissions(PERMISSIONS.SETTLEMENT_APPROVE)
   async reviewSettlement(
     @Param('id', ParseUUIDPipe) settlementId: string,
     @Body() body: ReviewSettlementInput,
@@ -46,8 +56,20 @@ export class SettlementsController {
     return this.settlementsService.reviewSettlement(settlementId, validated as ReviewSettlementInput, actor);
   }
 
+  @Post(':id/disburse')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.SETTLEMENT_DISBURSE)
+  async disburseSettlement(
+    @Param('id', ParseUUIDPipe) settlementId: string,
+    @Body() body: DisburseSettlementInput,
+    @CurrentUser() actor: AuthContext,
+  ) {
+    const validated = adminDisburseSettlementSchema.parse(body);
+    return this.settlementsService.disburseSettlement(settlementId, validated, actor);
+  }
+
   @Get('organizer/:organizationId/statement')
-  @RequirePermissions('finance.view' as any)
+  @RequirePermissions(PERMISSIONS.FINANCE_VIEW)
   async getOrganizerStatement(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Query('periodStart') periodStart: string,

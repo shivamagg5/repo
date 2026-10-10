@@ -1,0 +1,126 @@
+-- ScannerDatabase.sq
+-- Event Ecosystem - Scanner Offline Architecture (12_SCANNER_OFFLINE_ARCHITECTURE.md)
+
+CREATE TABLE EventTable (
+    eventId TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    startAt TEXT NOT NULL,
+    endAt TEXT,
+    gateScope TEXT,
+    datasetVersion INTEGER NOT NULL,
+    expiryTimestamp INTEGER NOT NULL
+);
+
+CREATE TABLE TicketValidationTable (
+    ticketId TEXT NOT NULL PRIMARY KEY,
+    credentialHash TEXT NOT NULL UNIQUE,
+    eventId TEXT NOT NULL,
+    accessTier TEXT NOT NULL,
+    status TEXT NOT NULL, -- VALID, USED, CANCELLED, REFUNDED
+    holderName TEXT,
+    seat TEXT,
+    gate TEXT,
+    isLocallyUsed INTEGER NOT NULL DEFAULT 0,
+    locallyCheckedInAt INTEGER,
+    FOREIGN KEY (eventId) REFERENCES EventTable(eventId) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_ticket_hash ON TicketValidationTable(credentialHash);
+CREATE INDEX idx_ticket_event ON TicketValidationTable(eventId);
+
+CREATE TABLE CheckInQueueTable (
+    syncId TEXT NOT NULL PRIMARY KEY,
+    deviceId TEXT NOT NULL,
+    eventId TEXT NOT NULL,
+    ticketId TEXT NOT NULL,
+    localTimestamp INTEGER NOT NULL,
+    datasetVersion INTEGER NOT NULL,
+    result TEXT NOT NULL, -- SUCCESS, DUPLICATE_LOCAL, OVERRIDE
+    syncStatus TEXT NOT NULL DEFAULT 'PENDING' -- PENDING, SYNCING, SYNCED, CONFLICT
+);
+
+CREATE INDEX idx_queue_status ON CheckInQueueTable(syncStatus);
+
+-- ─── Queries ────────────────────────────────────────────────────────────────
+
+getActiveEvent:
+SELECT * FROM EventTable LIMIT 1;
+
+insertOrReplaceEvent:
+INSERT OR REPLACE INTO EventTable(eventId, name, startAt, endAt, gateScope, datasetVersion, expiryTimestamp)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+clearEventTickets:
+DELETE FROM TicketValidationTable WHERE eventId = ?;
+
+clearEvent:
+DELETE FROM EventTable WHERE eventId = ?;
+
+getTicketByHash:
+SELECT * FROM TicketValidationTable
+WHERE credentialHash = ? AND eventId = ?
+LIMIT 1;
+
+getTicketById:
+SELECT * FROM TicketValidationTable
+WHERE ticketId = ? AND eventId = ?
+LIMIT 1;
+
+insertOrReplaceTicket:
+INSERT OR REPLACE INTO TicketValidationTable(
+    ticketId, credentialHash, eventId, accessTier, status, holderName, seat, gate, isLocallyUsed, locallyCheckedInAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+markTicketLocallyUsed:
+UPDATE TicketValidationTable
+SET isLocallyUsed = 1, locallyCheckedInAt = ?
+WHERE ticketId = ?;
+
+insertCheckInQueue:
+INSERT INTO CheckInQueueTable(syncId, deviceId, eventId, ticketId, localTimestamp, datasetVersion, result, syncStatus)
+VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING');
+
+getPendingCheckIns:
+SELECT * FROM CheckInQueueTable
+WHERE syncStatus = 'PENDING'
+ORDER BY localTimestamp ASC
+LIMIT ?;
+
+markCheckInSynced:
+UPDATE CheckInQueueTable
+SET syncStatus = 'SYNCED'
+WHERE syncId = ?;
+
+markCheckInConflict:
+UPDATE CheckInQueueTable
+SET syncStatus = 'CONFLICT'
+WHERE syncId = ?;
+
+getPendingQueueCount:
+SELECT COUNT(*) FROM CheckInQueueTable
+WHERE syncStatus = 'PENDING';
+
+getAllQueueRecords:
+SELECT * FROM CheckInQueueTable
+ORDER BY localTimestamp DESC;
+
+clearSyncedRecords:
+DELETE FROM CheckInQueueTable WHERE syncStatus = 'SYNCED';
+
+searchTicketsByNameOrId:
+SELECT * FROM TicketValidationTable
+WHERE eventId = :eventId AND (
+    holderName LIKE ('%' || :query || '%') OR
+    ticketId LIKE ('%' || :query || '%') OR
+    seat LIKE ('%' || :query || '%')
+)
+ORDER BY holderName ASC
+LIMIT 50;
+
+getGateStats:
+SELECT
+    COUNT(*) AS totalTickets,
+    SUM(CASE WHEN isLocallyUsed = 1 THEN 1 ELSE 0 END) AS admittedCount,
+    SUM(CASE WHEN isLocallyUsed = 0 THEN 1 ELSE 0 END) AS remainingCount
+FROM TicketValidationTable
+WHERE eventId = ?;

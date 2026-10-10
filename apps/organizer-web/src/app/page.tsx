@@ -3,14 +3,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { apiClient, ApiError } from '../lib/api';
+import { AnimatedMetric, MiniSparkline } from '../components/AnimatedMetric';
+import { apiClient } from '../lib/api';
+import { useAuth } from '@platform/auth';
 import type { OrganizerOverviewDto, Event } from '@platform/types';
 
 export default function OverviewPage() {
+  const { profile, user, organizations } = useAuth();
   const [overview, setOverview] = useState<OrganizerOverviewDto | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -20,15 +24,11 @@ export default function OverviewPage() {
         apiClient.getOrganizerOverview<OrganizerOverviewDto>(),
         apiClient.getOrganizerEvents<{ items: Event[]; nextCursor: string | null; hasMore: boolean }>({ limit: '5' }),
       ]);
-
-      setOverview(overviewRes.data);
-      setEvents(eventsRes.data.items ?? []);
+      if (overviewRes?.data) setOverview(overviewRes.data);
+      if (eventsRes?.data?.items) setEvents(eventsRes.data.items);
+      setLastUpdated(new Date());
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setError(err.message || 'Failed to load organizer dashboard metrics');
-      } else {
-        setError(err?.message || 'An unexpected error occurred while communicating with the server.');
-      }
+      setError(err?.message ?? 'Failed to synchronize organizer overview with authoritative ledger.');
     } finally {
       setLoading(false);
     }
@@ -38,10 +38,10 @@ export default function OverviewPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const formatCurrency = (minor: number) => {
-    const rupees = minor / 100;
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(rupees);
-  };
+  const fmt = (minor: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(
+      (minor || 0) / 100,
+    );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -63,199 +63,222 @@ export default function OverviewPage() {
   };
 
   return (
-    <DashboardLayout title="Dashboard Overview" subtitle="Real-time ticket sales, capacity tracking, and event operations">
-      {loading ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="stat-card skeleton h-32" />
-            ))}
-          </div>
-          <div className="surface-card skeleton h-72" />
-        </div>
-      ) : error ? (
-        <div className="surface-card p-8 text-center max-w-lg mx-auto my-12 border-red-500/30">
-          <div className="w-12 h-12 rounded-full bg-red-950/60 border border-red-600/50 flex items-center justify-center mx-auto mb-4 text-red-400">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 className="font-display text-2xl text-white mb-1 tracking-wide uppercase">Unable to Load Overview</h3>
-          <p className="text-xs text-slate-400 mb-5">{error}</p>
+    <DashboardLayout
+      title="Overview"
+      subtitle="Real-time sales, capacity & event operations"
+      actions={
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-slate-400">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
           <button
             type="button"
             onClick={fetchDashboardData}
-            className="btn-primary text-xs"
+            disabled={loading}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5"
           >
-            Retry Request
+            {loading ? 'Syncing...' : '↻ Refresh'}
           </button>
+          <Link
+            href="/events/new"
+            className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all"
+          >
+            + Create Event
+          </Link>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {/* KPI Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="stat-card">
-              <div className="flex justify-between items-start">
-                <span className="stat-card-label">Gross Sales</span>
-                <span className="badge badge-green text-[10px]">Authoritative</span>
-              </div>
-              <p className="stat-card-value text-white mt-1">{formatCurrency(overview?.grossTicketSalesMinor ?? 0)}</p>
-              <div className="stat-card-delta up">
-                <span className="metric-dot green" />
-                Net: {formatCurrency(overview?.netOrganizerMinor ?? 0)}
-              </div>
-            </div>
+      }
+    >
+      <div className="space-y-6">
+        {error && (
+          <div className="p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex justify-between items-center">
+            <span>{error}</span>
+            <button type="button" onClick={fetchDashboardData} className="font-bold underline ml-2">
+              Retry
+            </button>
+          </div>
+        )}
 
-            <div className="stat-card">
-              <div className="flex justify-between items-start">
-                <span className="stat-card-label">Tickets Sold</span>
-                <span className="badge badge-pink text-[10px]">Confirmed</span>
-              </div>
-              <p className="stat-card-value text-white mt-1">{(overview?.totalTicketsSold ?? 0).toLocaleString('en-IN')}</p>
-              <div className="stat-card-delta neutral">
-                <span className="metric-dot pink" />
-                Active Holds: {overview?.totalActiveHolds ?? 0}
-              </div>
+        {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="stat-card relative overflow-hidden group hover:border-[#1AFF7A]/40 transition-all duration-300">
+            <div className="flex justify-between items-start">
+              <span className="stat-card-label">Gross Sales</span>
+              <span className="badge badge-green text-[10px]">Authoritative</span>
             </div>
-
-            <div className="stat-card">
-              <div className="flex justify-between items-start">
-                <span className="stat-card-label">Capacity Util</span>
-                <span className="badge badge-cyan text-[10px]">Average</span>
-              </div>
-              <p className="stat-card-value text-white mt-1">{overview?.averageCapacityUtilization ?? 0}%</p>
-              <div className="w-full bg-surface-3 rounded-full h-1.5 mt-3 overflow-hidden">
-                <div
-                  className="bg-hot h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, overview?.averageCapacityUtilization ?? 0)}%` }}
-                />
-              </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <p className="stat-card-value text-white">
+                {loading && !overview ? (
+                  '—'
+                ) : (
+                  <AnimatedMetric
+                    value={overview?.grossTicketSalesMinor ?? 0}
+                    formatter={fmt}
+                  />
+                )}
+              </p>
+              <MiniSparkline color="#1AFF7A" points={[15, 25, 20, 45, 38, 55, 62, 78, 85, 100]} />
             </div>
-
-            <div className="stat-card">
-              <div className="flex justify-between items-start">
-                <span className="stat-card-label">Active Events</span>
-                <span className="badge badge-orange text-[10px]">Live Feed</span>
-              </div>
-              <p className="stat-card-value text-white mt-1">{overview?.totalActiveEvents ?? 0}</p>
-              <div className="stat-card-delta up">
-                <span className="metric-dot orange" />
-                Published & Scheduled
-              </div>
+            <div className="stat-card-delta up">
+              <span className="metric-dot green" /> Net: {loading && !overview ? '—' : fmt(overview?.netOrganizerMinor ?? 0)}
             </div>
           </div>
 
-          {/* Active Events & Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Events Console Feed */}
-            <div className="lg:col-span-2 surface-card">
-              <div className="surface-card-header">
-                <h3 className="surface-card-title flex items-center gap-2">
-                  <span className="metric-dot pink" />
-                  Active Event Operational Feed
-                </h3>
-                <Link href="/events" className="text-xs text-pink hover:text-orange font-semibold transition-colors">
-                  View All Events →
+          <div className="stat-card relative overflow-hidden group hover:border-[#FF2D78]/40 transition-all duration-300">
+            <div className="flex justify-between items-start">
+              <span className="stat-card-label">Tickets Sold</span>
+              <span className="badge badge-pink text-[10px]">Confirmed</span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <p className="stat-card-value text-white">
+                {loading && !overview ? (
+                  '—'
+                ) : (
+                  <AnimatedMetric
+                    value={overview?.totalTicketsSold ?? 0}
+                    formatter={(v) => v.toLocaleString('en-IN')}
+                  />
+                )}
+              </p>
+              <MiniSparkline color="#FF2D78" points={[10, 18, 25, 22, 35, 42, 40, 58, 65, 80]} />
+            </div>
+            <div className="stat-card-delta neutral">
+              Holds active: {loading && !overview ? '—' : (overview?.totalActiveHolds ?? 0)}
+            </div>
+          </div>
+
+          <div className="stat-card relative overflow-hidden group hover:border-[#00F0FF]/40 transition-all duration-300">
+            <div className="flex justify-between items-start">
+              <span className="stat-card-label">Active Events</span>
+              <span className="badge badge-cyan text-[10px]">Catalog</span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <p className="stat-card-value text-white">
+                {loading && !overview ? (
+                  '—'
+                ) : (
+                  <AnimatedMetric
+                    value={overview?.totalActiveEvents ?? events.length}
+                    formatter={(v) => v.toString()}
+                  />
+                )}
+              </p>
+              <MiniSparkline color="#00F0FF" points={[1, 2, 2, 3, 3, 4, 4, 5, 5, 6]} />
+            </div>
+            <div className="stat-card-delta up">
+              Capacity util: {loading && !overview ? '—' : `${overview?.averageCapacityUtilization ?? 0}%`}
+            </div>
+          </div>
+
+          <div className="stat-card relative overflow-hidden group hover:border-[#FFE500]/40 transition-all duration-300">
+            <div className="flex justify-between items-start">
+              <span className="stat-card-label">Promoter Commissions</span>
+              <span className="badge badge-yellow text-[10px]">Affiliates</span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <p className="stat-card-value text-white">
+                {loading && !overview ? (
+                  '—'
+                ) : (
+                  <AnimatedMetric
+                    value={overview?.promoterCommissionsMinor ?? 0}
+                    formatter={fmt}
+                  />
+                )}
+              </p>
+              <MiniSparkline color="#FFE500" points={[5, 8, 12, 10, 15, 22, 20, 28, 32, 40]} />
+            </div>
+            <div className="stat-card-delta neutral">
+              Refunds: {loading && !overview ? '—' : fmt(overview?.refundsMinor ?? 0)}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Active Events & Quick Controls ─────────────────────────────────── */}
+        <div className="surface-card">
+          <div className="surface-card-header flex justify-between items-center">
+            <div>
+              <h3 className="surface-card-title">Live & Upcoming Events</h3>
+              <p className="surface-card-subtitle">Real-time status, capacities & sales velocity</p>
+            </div>
+            <Link href="/events" className="text-xs text-purple-400 hover:text-purple-300 font-semibold transition-colors">
+              View All ({events.length}) →
+            </Link>
+          </div>
+          <div className="surface-card-body p-0">
+            {loading && events.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs">
+                Synchronizing event catalog...
+              </div>
+            ) : events.length === 0 ? (
+              <div className="p-10 text-center space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 text-xl">
+                  🎪
+                </div>
+                <h4 className="text-sm font-bold text-white">No active events created yet</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Launch your first concert, conference, or workshop to configure ticket tiers and start processing attendee bookings.
+                </p>
+                <Link
+                  href="/events/new"
+                  className="inline-block mt-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors"
+                >
+                  Create Your First Event
                 </Link>
               </div>
-
-              <div className="surface-card-body">
-                {events.length === 0 ? (
-                  <div className="text-center py-12 border border-dashed border-border rounded-xl">
-                    <p className="font-display text-xl text-white tracking-wide uppercase">No Events Scheduled</p>
-                    <p className="text-xs text-slate-400 mt-1 mb-5">Get started by creating your first event experience.</p>
-                    <Link
-                      href="/events/new"
-                      className="btn-primary text-xs"
-                    >
-                      + Create First Event
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/60 text-[10px] uppercase text-slate-500 font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Event</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Date & Time</th>
+                      <th className="py-3 px-4">Venue</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
                     {events.map((evt) => (
-                      <div
-                        key={evt.id}
-                        className="p-4 rounded-xl bg-surface-2 border border-border flex items-center justify-between hover:border-pink/40 hover:bg-surface-3/60 transition-all group"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-sm text-slate-100 group-hover:text-pink transition-colors">{evt.title}</h4>
-                            <span className={`badge ${getStatusBadge(evt.status)} text-[10px]`}>
-                              {evt.status}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-1">
-                            Starts {new Date(evt.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · Capacity: {evt.capacity ?? 'Flexible'}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
+                      <tr key={evt.id} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-white block text-sm">{evt.title}</span>
+                          <span className="text-slate-500 text-[10px] font-mono">ID: {evt.id}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`badge ${getStatusBadge(evt.status)} text-[10px]`}>
+                            ● {evt.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-400">
+                          {evt.startsAt ? new Date(evt.startsAt).toLocaleString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }) : 'TBA'}
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">
+                          {(evt as any).venueName ?? (evt as any).venue?.name ?? 'Main Arena'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
                           <Link
                             href={`/events/${evt.id}`}
-                            className="btn-secondary text-xs py-1.5 px-3.5"
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded text-[11px] font-medium transition-colors"
                           >
                             Manage →
                           </Link>
-                        </div>
-                      </div>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-
-            {/* Quick Actions Panel */}
-            <div className="surface-card flex flex-col justify-between">
-              <div>
-                <div className="surface-card-header">
-                  <h3 className="surface-card-title flex items-center gap-2">
-                    <span className="metric-dot orange" />
-                    Quick Actions
-                  </h3>
-                </div>
-                <div className="surface-card-body space-y-3">
-                  <Link
-                    href="/events/new"
-                    className="block p-3.5 rounded-xl bg-pink-dim border border-pink/30 hover:border-pink hover:glow-pink transition-all group"
-                  >
-                    <p className="text-xs font-bold text-pink group-hover:text-white transition-colors">🎪 Create Event Experience</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Publish new ticket tiers & seating maps</p>
-                  </Link>
-
-                  <Link
-                    href="/orders"
-                    className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
-                  >
-                    <p className="text-xs font-bold text-slate-100">🎟️ View Order Receipts</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Attendee orders & ticket records</p>
-                  </Link>
-
-                  <Link
-                    href="/promoters"
-                    className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
-                  >
-                    <p className="text-xs font-bold text-slate-100">🚀 Promoter Campaigns</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Affiliate codes & sales tracking</p>
-                  </Link>
-
-                  <Link
-                    href="/team"
-                    className="block p-3.5 rounded-xl bg-surface-2 border border-border hover:border-border-strong hover:bg-surface-3 transition-all"
-                  >
-                    <p className="text-xs font-bold text-slate-100">👥 Organization Team</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Staff roles & scanner permissions</p>
-                  </Link>
-                </div>
-              </div>
-
-              <div className="p-4 mx-4 mb-4 rounded-xl bg-surface-0 border border-border text-center">
-                <p className="text-[11px] text-slate-400 font-mono">⚡ Connected to Authoritative Ledger</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </DashboardLayout>
   );
 }

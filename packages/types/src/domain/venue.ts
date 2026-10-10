@@ -74,3 +74,50 @@ export interface UpdateVenueInput {
   longitude?: number | null;
   capacity?: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// VENUE SECTIONS & CAPACITY ZONES
+// ---------------------------------------------------------------------------
+
+export interface VenueSectionDto {
+  id: string;
+  venueId: string;
+  name: string; // e.g. 'Dance Floor', 'VIP Lounge', 'Rooftop Bar', 'Poolside Deck'
+  code: string;
+  capacity: number;
+  currentOccupancy: number;
+  status: 'open' | 'closed' | 'at_capacity';
+}
+
+export interface CreateVenueSectionInput {
+  venueId: string;
+  name: string;
+  code: string;
+  capacity: number;
+}
+
+// ---------------------------------------------------------------------------
+// PATRON INCIDENT & BLACKLIST
+// ---------------------------------------------------------------------------
+
+export interface PatronBlacklistDto {
+  id: string;
+  venueId: string;
+  patronName: string;
+  patronPhone: string | null;
+  patronEmail: string | null;
+  reason: string;
+  severity: 'warning' | 'banned';
+  reportedAt: string;
+  reportedBy: string;
+}
+
+export interface CreatePatronBlacklistInput {
+  venueId: string;
+  patronName: string;
+  patronPhone?: string | null;
+  patronEmail?: string | null;
+  reason: string;
+  severity?: 'warning' | 'banned';
+}
+

@@ -11,10 +11,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { PromotersService } from './promoters.service';
 import { ReferralService } from './referral.service';
+import { GuestlistService } from './guestlist.service';
 import {
   createPromoterCampaignSchema,
   recordReferralClickSchema,
   attributeOrderSchema,
+  createGuestlistSchema,
+  promoterPayoutRequestSchema,
 } from '@platform/validation';
 import type { AuthContext } from '@platform/types';
 
@@ -23,6 +26,7 @@ export class PromotersController {
   constructor(
     private readonly promotersService: PromotersService,
     private readonly referralService: ReferralService,
+    private readonly guestlistService: GuestlistService,
   ) {}
 
   @UseGuards(AuthGuard)
@@ -42,6 +46,21 @@ export class PromotersController {
   }
 
   @UseGuards(AuthGuard)
+  @Get('promoter/eligible-events')
+  getEligibleEvents(@CurrentUser() actor: AuthContext) {
+    return this.promotersService.findEligibleEvents(actor);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('promoter/campaigns/:id')
+  getCampaignDetail(
+    @CurrentUser() actor: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.promotersService.getCampaignDetail(actor, id);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('promoter/campaigns/:id/performance')
   getCampaignPerformance(
     @CurrentUser() actor: AuthContext,
@@ -54,6 +73,71 @@ export class PromotersController {
   @Get('promoter/earnings')
   getPromoterEarnings(@CurrentUser() actor: AuthContext) {
     return this.promotersService.getEarningsSummary(actor);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('promoter/commissions')
+  getPromoterCommissions(@CurrentUser() actor: AuthContext) {
+    return this.promotersService.getCommissions(actor);
+  }
+
+  /**
+   * PROMOTER GUESTLIST ENDPOINTS
+   */
+  @UseGuards(AuthGuard)
+  @Post('promoter/guestlists')
+  createGuestlist(
+    @CurrentUser() actor: AuthContext,
+    @Body() body: unknown,
+  ) {
+    const validated = createGuestlistSchema.parse(body);
+    return this.guestlistService.createGuestlistEntry(actor, validated);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('promoter/guestlists/:eventId')
+  getPromoterGuestlists(
+    @CurrentUser() actor: AuthContext,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.guestlistService.getPromoterGuestlists(actor, eventId);
+  }
+
+  /**
+   * DOOR OPERATIONS / SCANNER GUESTLIST ENDPOINTS
+   */
+  @UseGuards(AuthGuard)
+  @Get('events/:eventId/guestlists')
+  getEventGuestlists(@Param('eventId') eventId: string) {
+    return this.guestlistService.getEventGuestlists(eventId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('guestlists/:id/checkin')
+  checkInGuestlist(
+    @Param('id') id: string,
+    @Body('count') count?: number,
+  ) {
+    return this.guestlistService.checkInGuestlistEntry(id, count ?? 1);
+  }
+
+  /**
+   * PROMOTER UPI & BANK PAYOUT ENDPOINTS
+   */
+  @UseGuards(AuthGuard)
+  @Post('promoter/payouts/request')
+  requestPayout(
+    @CurrentUser() actor: AuthContext,
+    @Body() body: unknown,
+  ) {
+    const validated = promoterPayoutRequestSchema.parse(body);
+    return this.promotersService.requestCommissionPayout(actor, validated);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('promoter/payouts')
+  getPayouts(@CurrentUser() actor: AuthContext) {
+    return this.promotersService.getPayoutHistory(actor);
   }
 
   /**
@@ -79,3 +163,4 @@ export class PromotersController {
     return this.referralService.attributeOrder(actor.userId, orderId, code);
   }
 }
+

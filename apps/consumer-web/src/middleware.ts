@@ -54,10 +54,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for session cookie
+  // Check for session cookie or demo session cookie
   const accessToken = request.cookies.get('sb-access-token')?.value;
+  const demoRole = request.cookies.get('eventplatform_demo_role')?.value;
 
-  if (!accessToken) {
+  if (!accessToken && !demoRole) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(loginUrl);

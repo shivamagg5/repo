@@ -284,4 +284,101 @@ export class VenuesService {
       capacity: v.capacity,
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // VENUE SECTIONS & CAPACITY ZONES
+  // ---------------------------------------------------------------------------
+  private readonly sectionStore: Array<any> = [
+    {
+      id: 'SEC-MAIN-DANCE',
+      venueId: 'VEN-001',
+      name: 'Main Dance Floor',
+      code: 'DANCE_FLOOR',
+      capacity: 800,
+      currentOccupancy: 340,
+      status: 'open',
+    },
+    {
+      id: 'SEC-VIP-LOUNGE',
+      venueId: 'VEN-001',
+      name: 'VIP Mezzanine Lounge',
+      code: 'VIP_LOUNGE',
+      capacity: 150,
+      currentOccupancy: 85,
+      status: 'open',
+    },
+    {
+      id: 'SEC-ROOFTOP',
+      venueId: 'VEN-001',
+      name: 'Open Air Rooftop Deck',
+      code: 'ROOFTOP',
+      capacity: 250,
+      currentOccupancy: 120,
+      status: 'open',
+    },
+  ];
+
+  async createSection(actorId: string, input: any) {
+    const section = {
+      id: `SEC-${Date.now()}`,
+      venueId: input.venueId,
+      name: input.name,
+      code: input.code,
+      capacity: input.capacity,
+      currentOccupancy: 0,
+      status: 'open',
+    };
+    this.sectionStore.push(section);
+    return section;
+  }
+
+  async getSections(venueId: string) {
+    return this.sectionStore.filter((s) => s.venueId === venueId || s.venueId === 'VEN-001');
+  }
+
+  // ---------------------------------------------------------------------------
+  // PATRON INCIDENTS & BLACKLIST
+  // ---------------------------------------------------------------------------
+  private readonly blacklistStore: Array<any> = [];
+
+  async addPatronToBlacklist(actorId: string, input: any) {
+    const record = {
+      id: `BLK-${Date.now()}`,
+      venueId: input.venueId,
+      patronName: input.patronName,
+      patronPhone: input.patronPhone ?? null,
+      patronEmail: input.patronEmail ?? null,
+      reason: input.reason,
+      severity: input.severity ?? 'banned',
+      reportedAt: new Date().toISOString(),
+      reportedBy: actorId,
+    };
+    this.blacklistStore.push(record);
+
+    this.audit.log({
+      actorUserId: actorId,
+      action: 'venue.patron_blacklisted',
+      category: 'security',
+      entityType: 'patron_blacklist',
+      entityId: record.id,
+      metadata: { patronName: input.patronName, reason: input.reason, severity: record.severity },
+    });
+
+    return record;
+  }
+
+  async getVenueBlacklist(actorId: string, venueId: string) {
+    return this.blacklistStore.filter((b) => b.venueId === venueId);
+  }
+
+  async checkPatronBlacklist(venueId: string, nameOrPhone: string) {
+    const found = this.blacklistStore.find(
+      (b) =>
+        b.venueId === venueId &&
+        (b.patronName.toLowerCase() === nameOrPhone.toLowerCase() ||
+          (b.patronPhone && b.patronPhone === nameOrPhone)),
+    );
+    return found ? { blacklisted: true, record: found } : { blacklisted: false };
+  }
 }
+

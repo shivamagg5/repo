@@ -136,3 +136,91 @@ export interface VenueCalendarDto {
   timezone: string;
   events: VenueCalendarEventDto[];
 }
+
+export interface OrganizerCampaignDto {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  code: string;
+  name: string;
+  campaignType: string;
+  discountType?: 'percentage' | 'fixed';
+  discountValueMinor?: number;
+  ordersCount: number;
+  totalDiscountMinor: number;
+  grossSalesMinor: number;
+  usageLimit?: number | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface OrganizerMarketingOverviewDto {
+  totalCredits: number;
+  activeCampaignsCount: number;
+  totalOrdersAttributed: number;
+  totalDiscountGivenMinor: number;
+  currency: string;
+}
+
+export interface OrganizerCreditWalletDto {
+  balanceCredits: number;
+  currency: string;
+  transactions: Array<{
+    id: string;
+    credits: number;
+    amountMinor: number;
+    billingType: string;
+    description: string;
+    status?: string;
+    createdAt: string;
+  }>;
+}
+
+export interface OrganizerAttendeeDto {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  totalOrders: number;
+  totalSpendMinor: number;
+  lastOrderAt: string | null;
+  interestedGenres: string[];
+  tickets: Array<{
+    ticketId: string;
+    ticketNumber: string;
+    eventName: string;
+    tierName: string;
+    priceMinor: number;
+    status: string;
+    checkedInAt: string | null;
+  }>;
+}
+
+export interface OrganizerScanMetricsDto {
+  eventId: string;
+  totalTicketsIssued: number;
+  totalCheckedIn: number;
+  checkinPercentage: number;
+  gatesBreakdown: Array<{
+    gateId: string;
+    gateName: string;
+    scansCount: number;
+  }>;
+}
+
+export interface PaymentProfileDto {
+  id: string;
+  organizationId: string;
+  accountName: string;
+  nickname: string;
+  maskedAccountNumber: string;
+  ifsc: string;
+  panCard: string;
+  gstRegistered: boolean;
+  gstin?: string | null;
+  businessAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  createdAt: string;
+}

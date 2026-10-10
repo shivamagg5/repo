@@ -304,6 +304,18 @@ export const attendeeSearchQuerySchema = z.object({
   query: z.string().min(2).max(100),
 });
 
+export const scannerHeartbeatSchema = z.object({
+  deviceId: uuidSchema,
+  deviceIdentifier: z.string().max(100).optional(),
+  eventId: uuidSchema.optional(),
+  gateId: uuidSchema.optional(),
+  batteryLevel: z.number().min(0).max(100).optional(),
+  isCharging: z.boolean().optional(),
+  offlineQueueDepth: z.number().int().min(0).optional(),
+  networkLatencyMs: z.number().min(0).optional(),
+  appVersion: z.string().max(50).optional(),
+});
+
 // ---------------------------------------------------------------------------
 // Admin Domain Schemas
 // ---------------------------------------------------------------------------
@@ -343,7 +355,7 @@ export const generateSettlementSchema = z.object({
 });
 
 export const reviewSettlementSchema = z.object({
-  action: z.enum(['approve', 'reject']),
+  action: z.enum(['approve', 'reject', 'hold']),
   reason: z.string().max(500).optional(),
 });
 
@@ -434,6 +446,209 @@ export const reauthInputSchema = z.object({
   mfaCode: z.string().optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Organizer Marketing & Campaigns Schemas
+// ---------------------------------------------------------------------------
+export const createOrganizerCampaignSchema = z.object({
+  eventId: uuidSchema,
+  name: z.string().min(2).max(100),
+  code: z.string().min(2).max(50).regex(/^[a-zA-Z0-9_-]+$/, { message: 'Code must be alphanumeric.' }),
+  campaignType: z.enum(['discount_code', 'whatsapp_blast', 'sms_campaign', 'email_newsletter', 'qr_campaign']),
+  discountType: z.enum(['percentage', 'fixed']).optional(),
+  discountValueMinor: z.number().int().nonnegative().optional(),
+  usageLimit: z.number().int().positive().optional(),
+  startsAt: isoDateSchema.optional(),
+  endsAt: isoDateSchema.optional(),
+}).strict();
+
+export const addMarketingCreditsSchema = z.object({
+  credits: z.number().int().min(100),
+  billingType: z.enum(['individual', 'company', 'firm']),
+  firmName: z.string().max(200).optional(),
+  billingEmail: emailSchema.optional(),
+  country: z.string().max(100).default('India'),
+  state: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  address: z.string().max(500).optional(),
+}).strict();
+
+// ---------------------------------------------------------------------------
+// Organizer Attendee & Data Schemas
+// ---------------------------------------------------------------------------
+export const attendeeQuerySchema = z.object({
+  eventId: uuidSchema.optional(),
+  search: z.string().max(100).optional(),
+  genre: z.string().max(100).optional(),
+  firstTxnDate: z.string().optional(),
+  lastTxnDate: z.string().optional(),
+  sortBy: z.enum(['lastTxn', 'totalSpend', 'totalTxns']).default('lastTxn'),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(25),
+});
+
+// ---------------------------------------------------------------------------
+// Organizer Payout & Payment Profile Schemas
+// ---------------------------------------------------------------------------
+export const createPaymentProfileSchema = z.object({
+  accountName: z.string().min(2).max(200),
+  nickname: z.string().max(100).optional(),
+  businessAddress: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  pincode: z.string().max(20).optional(),
+  state: z.string().max(100).optional(),
+  country: z.string().max(100).default('India'),
+  accountNumber: z.string().min(8).max(30),
+  ifsc: z.string().min(4).max(20),
+  pan: z.string().min(5).max(20),
+  gstRegistered: z.boolean(),
+  gstin: z.string().max(30).optional(),
+}).strict();
+
+// ---------------------------------------------------------------------------
+// Admin Customer Management Schemas
+// ---------------------------------------------------------------------------
+export const customerSearchQuerySchema = z.object({
+  search: z.string().max(100).optional(),
+  tier: z.enum(['all', 'vip', 'regular', 'flagged', 'suspended']).default('all'),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(25),
+});
+
+export const updateCustomerNotesSchema = z.object({
+  adminNotes: z.string().max(2000),
+}).strict();
+
+export const adminTicketReissueSchema = z.object({
+  ticketId: uuidSchema,
+  reason: z.string().min(3).max(500),
+}).strict();
+
+export const adminTicketTransferSchema = z.object({
+  ticketId: uuidSchema,
+  targetEmail: emailSchema,
+  reason: z.string().min(3).max(500),
+}).strict();
+
+// ---------------------------------------------------------------------------
+// Admin Support & Disputes Schemas
+// ---------------------------------------------------------------------------
+export const adminSupportTicketUpdateSchema = z.object({
+  status: z.enum(['open', 'in_progress', 'resolved', 'closed']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  internalNotes: z.string().max(2000).optional(),
+  assignedAdminId: uuidSchema.optional(),
+}).strict();
+
+export const adminRefundDecisionSchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+  reason: z.string().min(3).max(500),
+}).strict();
+
+// ---------------------------------------------------------------------------
+// Nightlife, Guestlists & Promoter Payout Schemas
+// ---------------------------------------------------------------------------
+export const partyEntryTypeSchema = z.enum(['general', 'couple', 'female', 'stag', 'vip_table', 'guestlist']);
+
+export const createGuestlistSchema = z.object({
+  eventId: uuidSchema,
+  guestName: z.string().min(2).max(100),
+  guestPhone: phoneSchema,
+  guestEmail: emailSchema.optional(),
+  entryType: partyEntryTypeSchema.default('guestlist'),
+  allowedCount: z.number().int().positive().max(20).default(1),
+  curfewTime: z.string().optional(),
+  tableNumber: z.string().max(50).optional(),
+  notes: z.string().max(500).optional(),
+}).strict();
+
+export const promoterPayoutRequestSchema = z.object({
+  amountMinor: z.number().int().positive(),
+  payoutMethod: z.enum(['upi', 'bank_transfer']),
+  upiId: z.string().min(3).max(100).optional(),
+  bankAccount: z.object({
+    accountNumber: z.string().min(8).max(30),
+    ifscCode: z.string().min(4).max(20),
+    accountHolderName: z.string().min(2).max(100),
+  }).optional(),
+  notes: z.string().max(500).optional(),
+}).refine((data) => {
+  if (data.payoutMethod === 'upi') return !!data.upiId && data.upiId.includes('@');
+  if (data.payoutMethod === 'bank_transfer') return !!data.bankAccount;
+  return true;
+}, {
+  message: 'Valid UPI ID (e.g. name@bank) or Bank Account details required based on payoutMethod.',
+});
+
+export const createVenueSectionSchema = z.object({
+  venueId: uuidSchema,
+  name: z.string().min(2).max(100),
+  code: z.string().min(2).max(50),
+  capacity: z.number().int().positive(),
+}).strict();
+
+export const createPatronBlacklistSchema = z.object({
+  venueId: uuidSchema,
+  patronName: z.string().min(2).max(100),
+  patronPhone: phoneSchema,
+  patronEmail: emailSchema.optional(),
+  reason: z.string().min(3).max(500),
+  severity: z.enum(['warning', 'banned']).default('banned'),
+}).strict();
+
+export const adminReviewKybSchema = z.object({
+  status: z.enum(['verified', 'rejected']).optional(),
+  action: z.enum(['verify', 'reject']).optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export const adminUpdateOrgStatusSchema = z.object({
+  status: z.enum(['active', 'suspended']),
+}).strict();
+
+export const adminUpdateCommissionSchema = z.object({
+  customCommissionRateBps: z.number().int().min(0).max(5000),
+}).strict();
+
+export const adminGrantCreditsSchema = z.object({
+  organizationId: uuidSchema,
+  amount: z.number().int().positive(),
+  reason: z.string().min(3).max(250),
+  idempotencyKey: z.string().min(8).max(200),
+}).strict();
+
+export const adminModerateCampaignSchema = z.object({
+  status: z.enum(['delivered', 'flagged_content']),
+}).strict();
+
+export const adminProcessPayoutSchema = z.object({
+  payoutId: uuidSchema,
+  idempotencyKey: z.string().min(8).max(200),
+  notes: z.string().max(500).optional(),
+}).strict();
+
+export const adminDisburseSettlementSchema = z.object({
+  transactionReference: z.string().min(3).max(100),
+  paidAt: isoDateSchema.optional(),
+  idempotencyKey: z.string().min(8).max(200),
+}).strict();
+
+export const adminToggleFeaturedSchema = z.object({
+  featured: z.boolean(),
+}).strict();
+
+export const createScannerPairingTokenSchema = z.object({
+  eventId: uuidSchema,
+  gateId: uuidSchema.optional(),
+}).strict();
+
+export const scannerOnboardSchema = z.object({
+  pairingCode: z.string().min(6).max(10),
+  deviceName: z.string().min(2).max(100),
+  deviceFingerprint: z.string().min(4).max(200),
+  publicKeyPem: z.string().min(30),
+}).strict();
+
 // Re-export zod for convenience
 export { z };
+
 

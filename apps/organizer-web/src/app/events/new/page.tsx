@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '../../../components/DashboardLayout';
@@ -32,11 +32,24 @@ export default function NewEventPage() {
     mediaAdded: false,
   });
 
+  // Venues State
+  const [venues, setVenues] = useState<Array<{ id: string; name: string; city?: string }>>([]);
+
+  useEffect(() => {
+    apiClient.getPublicVenues<any>()
+      .then((res: any) => {
+        const list = Array.isArray(res) ? res : (res?.data ?? res?.items ?? []);
+        setVenues(list);
+      })
+      .catch(() => {});
+  }, []);
+
   // Form State
   const [form, setForm] = useState({
     title: '',
     slug: '',
     description: '',
+    venueId: '',
     startsAt: '2026-09-01T19:00',
     endsAt: '2026-09-01T23:00',
     timezone: 'Asia/Kolkata',
@@ -92,6 +105,7 @@ export default function NewEventPage() {
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: new Date(form.endsAt).toISOString(),
           timezone: form.timezone,
+          venueId: form.venueId ? form.venueId : undefined,
           ageRestriction: form.ageRestriction || undefined,
         };
 
@@ -131,17 +145,20 @@ export default function NewEventPage() {
         }
       }
 
-      // Step 3: Set Lineup if provided
+      // Step 3: Set Lineup if provided (supports multiple comma-separated artists)
       if (eventId && !creationProgress.lineupSet && form.lineupArtist.trim()) {
         try {
+          const artistList = form.lineupArtist
+            .split(',')
+            .map((a) => a.trim())
+            .filter(Boolean);
+
           await apiClient.setEventLineup(eventId, {
-            lineup: [
-              {
-                name: form.lineupArtist.trim(),
-                role: form.lineupRole || null,
-                sortOrder: 0,
-              },
-            ],
+            lineup: artistList.map((name, idx) => ({
+              name,
+              role: idx === 0 ? (form.lineupRole || 'Headliner') : 'Supporting Act',
+              sortOrder: idx,
+            })),
           });
           setCreationProgress((prev) => ({ ...prev, lineupSet: true }));
         } catch (lineupErr: any) {
@@ -311,7 +328,25 @@ export default function NewEventPage() {
 
           {step === 3 && (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-slate-100">Step 3: Category & Restrictions</h3>
+              <h3 className="text-base font-bold text-slate-100">Step 3: Venue & Category</h3>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Select Venue *</label>
+                <select
+                  value={form.venueId}
+                  onChange={(e) => setForm({ ...form, venueId: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                >
+                  <option value="">Select a registered venue or arena...</option>
+                  {venues.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.city ? `(${v.city})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Link your event to an existing physical stadium, arena, or nightclub.
+                </p>
+              </div>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Event Category</label>
                 <select
@@ -352,15 +387,33 @@ export default function NewEventPage() {
                   placeholder="https://images.unsplash.com/..."
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
                 />
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
+                  <span className="text-[11px] text-slate-400 shrink-0">Quick presets:</span>
+                  {[
+                    { label: 'EDM Concert', url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop&q=80' },
+                    { label: 'Club Rave', url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop&q=80' },
+                    { label: 'Comedy Show', url: 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=1200&auto=format&fit=crop&q=80' },
+                    { label: 'Festival Stage', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=1200&auto=format&fit=crop&q=80' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setForm({ ...form, coverMediaUrl: preset.url })}
+                      className="text-[11px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 transition-colors"
+                    >
+                      + {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Lead Artist / Speaker</label>
+                  <label className="text-xs text-slate-400 block mb-1">Artists / Performers (comma-separated)</label>
                   <input
                     type="text"
                     value={form.lineupArtist}
                     onChange={(e) => setForm({ ...form, lineupArtist: e.target.value })}
-                    placeholder="e.g. DJ Shadow"
+                    placeholder="e.g. DJ Shadow, Nucleya, Lost Stories"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
                   />
                 </div>
@@ -452,6 +505,12 @@ export default function NewEventPage() {
                 <div className="flex justify-between">
                   <span className="text-slate-400">Slug:</span>
                   <span className="font-mono text-purple-300">/events/{form.slug}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Venue:</span>
+                  <span className="font-bold text-slate-200">
+                    {venues.find((v) => v.id === form.venueId)?.name || 'Venue TBD / Unassigned'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Timing:</span>

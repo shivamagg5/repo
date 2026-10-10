@@ -50,6 +50,16 @@ export class ApiClient extends CoreApiClient {
     const res = await super.getPublicCategories<T>();
     return res.data;
   }
+
+  async getUserProfile<T = any>(): Promise<T> {
+    const res = await this.get<T>('/users/me');
+    return res.data;
+  }
+
+  async updateUserProfile<T = any>(body: { name?: string; phone?: string; avatarUrl?: string }): Promise<T> {
+    const res = await this.patch<T>('/users/me', body);
+    return res.data;
+  }
 }
 
 export const apiClient = new ApiClient();

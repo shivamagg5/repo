@@ -180,6 +180,10 @@ export class ApiClient {
     return this.get<T>('/cms/banners');
   }
 
+  async getAdminCmsBanners<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/cms/admin/banners');
+  }
+
   async getCmsFeaturedEvents<T>(): Promise<ApiSuccess<T>> {
     return this.get<T>('/cms/featured-events');
   }
@@ -188,12 +192,36 @@ export class ApiClient {
     return this.get<T>('/cms/editorial-blocks');
   }
 
+  async getCmsCollections<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/cms/collections');
+  }
+
   async createCmsBanner<T>(body: unknown): Promise<ApiSuccess<T>> {
     return this.post<T>('/cms/banners', body);
   }
 
+  async updateCmsBanner<T>(id: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>(`/cms/banners/${encodeURIComponent(id)}`, body);
+  }
+
+  async deleteCmsBanner<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.delete<T>(`/cms/banners/${encodeURIComponent(id)}`);
+  }
+
   async createCmsCollection<T>(body: unknown): Promise<ApiSuccess<T>> {
     return this.post<T>('/cms/collections', body);
+  }
+
+  async createCmsEditorialBlock<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/cms/editorial-blocks', body);
+  }
+
+  async addCmsFeaturedEvent<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/cms/featured-events', body);
+  }
+
+  async removeCmsFeaturedEvent<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.delete<T>(`/cms/featured-events/${encodeURIComponent(id)}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -331,6 +359,18 @@ export class ApiClient {
     return this.get<T>('/promoter/earnings');
   }
 
+  async getPromoterCommissions<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/promoter/commissions');
+  }
+
+  async getPromoterPayouts<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/promoter/payouts');
+  }
+
+  async requestPromoterPayout<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/promoter/payouts/request', body);
+  }
+
   async recordReferralClick<T>(body: unknown): Promise<ApiSuccess<T>> {
     return this.post<T>('/public/referrals/click', body);
   }
@@ -399,6 +439,22 @@ export class ApiClient {
 
   async inviteVenueStaff<T>(body: unknown): Promise<ApiSuccess<T>> {
     return this.post<T>('/venue/staff', body);
+  }
+
+  async getVenueTables<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/venue/tables');
+  }
+
+  async updateVenueTable<T>(tableId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>(`/venue/tables/${encodeURIComponent(tableId)}`, body);
+  }
+
+  async addVenueTableOrder<T>(tableId: string, bottleName: string, price?: number): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/venue/tables/${encodeURIComponent(tableId)}/orders`, { bottleName, price });
+  }
+
+  async resetVenueTable<T>(tableId: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/venue/tables/${encodeURIComponent(tableId)}/reset`);
   }
 
   // ---------------------------------------------------------------------------
@@ -502,6 +558,42 @@ export class ApiClient {
     return this.post<T>('/scanner/manual-checkin', body);
   }
 
+  async getTurnstileTelemetry<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/events/${encodeURIComponent(eventId)}/telemetry`);
+  }
+
+  getTurnstileTelemetryStreamUrl(eventId: string, token?: string): string {
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${this.baseUrl}/events/${encodeURIComponent(eventId)}/live/telemetry${query}`;
+  }
+
+  async recordDoorClicker<T>(
+    eventId: string,
+    body: { delta?: number; direction: 'admit' | 'exit'; gate?: string },
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/events/${encodeURIComponent(eventId)}/clicker`, body);
+  }
+
+  async admitDoorWalkIn<T>(eventId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/events/${encodeURIComponent(eventId)}/door-walkin`, body);
+  }
+
+  async getEventDevices<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/scanner/events/${encodeURIComponent(eventId)}/devices`);
+  }
+
+  async recordScannerHeartbeat<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/scanner/heartbeat', body);
+  }
+
+  async getEventGuestlists<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/events/${encodeURIComponent(eventId)}/guestlists`);
+  }
+
+  async checkInGuestlistEntry<T>(guestlistId: string, count: number = 1): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/guestlists/${encodeURIComponent(guestlistId)}/checkin`, { count });
+  }
+
   // ---------------------------------------------------------------------------
   // Admin Domain Methods
   // ---------------------------------------------------------------------------
@@ -517,8 +609,10 @@ export class ApiClient {
     return this.post<T>(`/admin/users/${encodeURIComponent(id)}/restore`);
   }
 
-  async getAdminEventReviewQueue<T>(limit?: number): Promise<ApiSuccess<T>> {
-    const params = limit ? { limit: String(limit) } : undefined;
+  async getAdminEventReviewQueue<T>(limitOrParams?: number | Record<string, string>): Promise<ApiSuccess<T>> {
+    const params = typeof limitOrParams === 'number'
+      ? { limit: String(limitOrParams) }
+      : limitOrParams;
     return this.get<T>('/admin/events/review-queue', params);
   }
 
@@ -541,7 +635,263 @@ export class ApiClient {
   async getAdminAuditLogs<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
     return this.get<T>('/admin/audit-logs', params);
   }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Marketing & Campaigns
+  // ---------------------------------------------------------------------------
+  async getOrganizerMarketingOverview<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/marketing/overview');
+  }
+
+  async getOrganizerMarketingCampaigns<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/marketing/campaigns');
+  }
+
+  async createOrganizerMarketingCampaign<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/organizer/marketing/campaigns', body);
+  }
+
+  async getOrganizerMarketingCredits<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/marketing/credits');
+  }
+
+  async topupOrganizerMarketingCredits<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/organizer/marketing/credits/topup', body);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Data & Attendees
+  // ---------------------------------------------------------------------------
+  async getOrganizerAttendees<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/data/attendees', params);
+  }
+
+  async getOrganizerPromoterPerformance<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/data/promoters');
+  }
+
+  async getOrganizerScanMetrics<T>(eventId?: string): Promise<ApiSuccess<T>> {
+    const params = eventId ? { eventId } : undefined;
+    return this.get<T>('/organizer/data/scan-metrics', params);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Payouts & Profiles
+  // ---------------------------------------------------------------------------
+  async getOrganizerPaymentProfiles<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/payouts/profiles');
+  }
+
+  async createOrganizerPaymentProfile<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/organizer/payouts/profiles', body);
+  }
+
+  async getOrganizerEventPayouts<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/payouts/events');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin Customers & 360 Profiles
+  // ---------------------------------------------------------------------------
+  async getAdminCustomers<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/customers', params);
+  }
+
+  async getAdminCustomerProfile<T>(id: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/admin/customers/${encodeURIComponent(id)}`);
+  }
+
+  async updateAdminCustomerNotes<T>(id: string, adminNotes: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/customers/${encodeURIComponent(id)}/notes`, { adminNotes });
+  }
+
+  async reissueAdminCustomerTicket<T>(ticketId: string, reason: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/customers/tickets/${encodeURIComponent(ticketId)}/reissue`, { reason });
+  }
+
+  async transferAdminCustomerTicket<T>(ticketId: string, targetEmail: string, reason: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/customers/tickets/${encodeURIComponent(ticketId)}/transfer`, { targetEmail, reason });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin Support & Disputes
+  // ---------------------------------------------------------------------------
+  async getAdminSupportTickets<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/support/tickets', params);
+  }
+
+  async updateAdminSupportTicket<T>(id: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>(`/admin/support/tickets/${encodeURIComponent(id)}`, body);
+  }
+
+  async getAdminRefundQueue<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/support/refund-queue');
+  }
+
+  async decideAdminRefund<T>(orderId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/support/refund-queue/${encodeURIComponent(orderId)}/decision`, body);
+  }
+
+  async getAdminChargebackLogs<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/support/chargebacks');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin Dashboard Operations (Events, Organizers, Marketing, Promoters, Settlements)
+  // ---------------------------------------------------------------------------
+  async getAdminEvents<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/events', params);
+  }
+
+  async toggleAdminEventFeatured<T>(eventId: string, featured: boolean): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/events/${encodeURIComponent(eventId)}/toggle-featured`, { featured });
+  }
+
+  async getAdminOrganizers<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/organizers', params);
+  }
+
+  async reviewAdminOrganizerKyb<T>(orgId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/organizers/${encodeURIComponent(orgId)}/kyb`, body);
+  }
+
+  async updateAdminOrganizerStatus<T>(orgId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/organizers/${encodeURIComponent(orgId)}/status`, body);
+  }
+
+  async updateAdminOrganizerCommission<T>(orgId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/organizers/${encodeURIComponent(orgId)}/commission`, body);
+  }
+
+  async getAdminMarketingWallets<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/marketing/wallets', params);
+  }
+
+  async grantAdminMarketingCredits<T>(orgId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/marketing/wallets/${encodeURIComponent(orgId)}/grant`, body);
+  }
+
+  async getAdminMarketingCampaigns<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/marketing/campaigns', params);
+  }
+
+  async moderateAdminMarketingCampaign<T>(campaignId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/marketing/campaigns/${encodeURIComponent(campaignId)}/moderate`, body);
+  }
+
+  async getAdminPromoters<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/promoters', params);
+  }
+
+  async processAdminPromoterPayout<T>(payoutId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/promoters/payouts/${encodeURIComponent(payoutId)}/process`, body);
+  }
+
+  async rejectAdminPromoterPayout<T>(payoutId: string, reason: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/admin/promoters/payouts/${encodeURIComponent(payoutId)}/reject`, { reason });
+  }
+
+  async getAdminSettlements<T>(params?: Record<string, string>): Promise<ApiSuccess<T>> {
+    return this.get<T>('/admin/settlements', params);
+  }
+
+  async disburseSettlement<T>(settlementId: string, body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/settlements/${encodeURIComponent(settlementId)}/disburse`, body);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Receipt & Scanner Pairing
+  // ---------------------------------------------------------------------------
+  async getOrganizerOrderReceipt<T>(eventId: string, orderId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/organizer/events/${encodeURIComponent(eventId)}/orders/${encodeURIComponent(orderId)}/receipt`);
+  }
+
+  async createScannerPairingToken<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/organizer/scanner/pairing-token', body);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Scanner Onboarding & Promoter Eligible Events
+  // ---------------------------------------------------------------------------
+  async onboardScanner<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/scanner/onboard', body);
+  }
+
+  async getPromoterEligibleEvents<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/promoter/eligible-events');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Newsletter Lead Capture
+  // ---------------------------------------------------------------------------
+  async subscribeNewsletter<T>(email: string, source = 'consumer-web'): Promise<ApiSuccess<T>> {
+    return this.post<T>('/public/newsletter/subscribe', { email, source });
+  }
+
+  // ---------------------------------------------------------------------------
+  // User Favorites (Bookmarks)
+  // ---------------------------------------------------------------------------
+  async getUserFavorites<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/users/me/favorites');
+  }
+
+  async addUserFavorite<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/users/me/favorites/${encodeURIComponent(eventId)}`);
+  }
+
+  async removeUserFavorite<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.delete<T>(`/users/me/favorites/${encodeURIComponent(eventId)}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Organizer Team Members Management
+  // ---------------------------------------------------------------------------
+  async removeOrganizerTeamMember<T>(userId: string): Promise<ApiSuccess<T>> {
+    return this.delete<T>(`/organizer/team/${encodeURIComponent(userId)}`);
+  }
+
+  async updateOrganizerTeamMemberRole<T>(userId: string, roleId: string): Promise<ApiSuccess<T>> {
+    return this.patch<T>(`/organizer/team/${encodeURIComponent(userId)}/role`, { roleId });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Organizer WhatsApp Broadcast Templates
+  // ---------------------------------------------------------------------------
+  async getOrganizerWhatsappTemplates<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/organizer/marketing/whatsapp-templates');
+  }
+
+  async createOrganizerWhatsappTemplate<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/organizer/marketing/whatsapp-templates', body);
+  }
+
+  // ---------------------------------------------------------------------------
+  // User Favorites & Bookmarks Methods
+  // ---------------------------------------------------------------------------
+  async getFavorites<T>(): Promise<ApiSuccess<T>> {
+    return this.get<T>('/users/me/favorites');
+  }
+
+  async addFavorite<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.post<T>(`/users/me/favorites/${encodeURIComponent(eventId)}`);
+  }
+
+  async removeFavorite<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.delete<T>(`/users/me/favorites/${encodeURIComponent(eventId)}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Promoter Guestlist Methods
+  // ---------------------------------------------------------------------------
+  async createPromoterGuestlist<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/promoter/guestlists', body);
+  }
+
+  async getPromoterGuestlists<T>(eventId: string): Promise<ApiSuccess<T>> {
+    return this.get<T>(`/promoter/guestlists/${encodeURIComponent(eventId)}`);
+  }
 }
+
 
 /**
  * Create a singleton API client instance.

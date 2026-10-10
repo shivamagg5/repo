@@ -11,7 +11,7 @@ function OrganizerLoginForm() {
   const redirectTo = rawRedirect.startsWith('/auth') ? '/' : rawRedirect;
   const { login, loginAsDemo, error: authError, clearError } = useAuth();
 
-  const [email, setEmail] = useState('organizer1@staging.eventplatform.com');
+  const [email, setEmail] = useState('organizer@staging.eventplatform.com');
   const [password, setPassword] = useState('Organizer@12345');
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

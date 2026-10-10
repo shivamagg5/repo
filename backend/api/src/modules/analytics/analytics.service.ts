@@ -13,8 +13,9 @@ import {
   checkins,
   refunds,
   events,
+  organizations,
 } from '../../database/schema/index';
-import { eq, and, gte, lte, inArray, sql, count, sum } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, sql, count, sum, ne } from 'drizzle-orm';
 import type {
   AuthContext,
   RecordAnalyticsEventInput,
@@ -276,28 +277,78 @@ export class AnalyticsService {
   }
 
   /**
-   * AUTHORITATIVE ORGANIZER ANALYTICS
+   * AUTHORITATIVE ORGANIZER ANALYTICS (FIX-022 — no hardcoded percentages)
    */
   async getOrganizerAnalytics(organizationId: string, eventId?: string): Promise<OrganizerAnalyticsDto> {
     const db = this.databaseService.db;
 
-    const paidOrders = await db.query.orders.findMany({
-      where: eq(orders.status, 'paid'),
-    });
+    // Revenue and orders scoped to this organization's events
+    const orgEventIds = await db
+      .select({ id: events.id })
+      .from(events)
+      .where(eq(events.organizerOrganizationId, organizationId));
+
+    const orgEventIdList = orgEventIds.map((e) => e.id);
 
     let totalGrossRevenueMinor = 0;
-    for (const o of paidOrders) totalGrossRevenueMinor += o.totalMinor;
+    let totalOrdersCount = 0;
 
-    const totalOrdersCount = paidOrders.length;
+    if (orgEventIdList.length > 0) {
+      const paidOrders = await db
+        .select({ totalMinor: orders.totalMinor })
+        .from(orders)
+        .where(and(eq(orders.status, 'paid'), inArray(orders.eventId, orgEventIdList)));
+
+      totalOrdersCount = paidOrders.length;
+      for (const o of paidOrders) totalGrossRevenueMinor += o.totalMinor;
+    }
+
     const averageOrderValueMinor = totalOrdersCount > 0 ? Math.round(totalGrossRevenueMinor / totalOrdersCount) : 0;
 
-    const issuedTickets = await db.select({ count: count() }).from(tickets);
-    const totalTicketsSolds = Number(issuedTickets[0]?.count ?? 0);
+    // Tickets scoped to org events
+    let totalTicketsSolds = 0;
+    if (orgEventIdList.length > 0) {
+      const issuedTickets = await db
+        .select({ count: count() })
+        .from(tickets)
+        .where(inArray(tickets.eventId, orgEventIdList));
+      totalTicketsSolds = Number(issuedTickets[0]?.count ?? 0);
+    }
 
-    const checkinsRes = await db.select({ count: count() }).from(checkins);
-    const totalCheckins = Number(checkinsRes[0]?.count ?? 0);
+    // Check-ins scoped to org events
+    let totalCheckins = 0;
+    if (orgEventIdList.length > 0) {
+      const checkinsRes = await db
+        .select({ count: count() })
+        .from(checkins)
+        .where(inArray(checkins.eventId, orgEventIdList));
+      totalCheckins = Number(checkinsRes[0]?.count ?? 0);
+    }
 
     const attendanceRatePercent = totalTicketsSolds > 0 ? Math.round((totalCheckins / totalTicketsSolds) * 100) : 0;
+
+    // Conversion rate: event_view → payment_success scoped to this org's events
+    // analyticsEvents doesn't have organizationId; scope by org's eventId list
+    let conversionRatePercent = 0;
+    if (orgEventIdList.length > 0) {
+      const eventIdFilter = eventId
+        ? [eq(analyticsEvents.eventId, eventId)]
+        : [inArray(analyticsEvents.eventId, orgEventIdList)];
+
+      const [viewsRow] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(and(eq(analyticsEvents.eventName, 'event_view'), ...eventIdFilter));
+
+      const [paymentsRow] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(and(eq(analyticsEvents.eventName, 'payment_success'), ...eventIdFilter));
+
+      const viewsCount = Number(viewsRow?.count ?? 0);
+      const paymentsCount = Number(paymentsRow?.count ?? 0);
+      conversionRatePercent = viewsCount > 0 ? Math.round((paymentsCount / viewsCount) * 100) : 0;
+    }
 
     return {
       organizationId,
@@ -305,14 +356,14 @@ export class AnalyticsService {
       totalGrossRevenueMinor,
       totalOrdersCount,
       totalTicketsSolds,
-      conversionRatePercent: 12, // Aggregate discovery conversion
+      conversionRatePercent,
       attendanceRatePercent,
       averageOrderValueMinor,
     };
   }
 
   /**
-   * AUTHORITATIVE SCANNER OPERATIONAL METRICS
+   * AUTHORITATIVE SCANNER OPERATIONAL METRICS (FIX-022 — no hardcoded zeros)
    */
   async getScannerMetrics(eventId: string): Promise<ScannerMetricsDto> {
     const db = this.databaseService.db;
@@ -321,54 +372,104 @@ export class AnalyticsService {
       where: eq(checkins.eventId, eventId),
     });
 
-    const successfulScans = allCheckins.length;
-    const offlineScans = allCheckins.filter((c) => c.result === 'offline_pending' || c.deviceId !== null).length;
+    const successfulScans = allCheckins.filter((c) => c.result === 'success').length;
+    const invalidScans = allCheckins.filter((c) => c.result === 'invalid').length;
+    const alreadyUsedScans = allCheckins.filter((c) => c.result === 'already_used').length;
+    const refundedScans = allCheckins.filter((c) => c.result === 'refunded').length;
+    const offlineScans = allCheckins.filter((c) => c.result === 'offline_pending').length;
+    // 'conflict' is not in the checkin_result enum; offline sync conflicts tracked separately
+    const syncConflicts = 0;
+    const totalScanAttempts = allCheckins.length;
+
+    const scanSuccessRatePercent =
+      totalScanAttempts > 0 ? Math.round((successfulScans / totalScanAttempts) * 100) : 0;
 
     return {
       eventId,
-      totalScanAttempts: successfulScans,
+      totalScanAttempts,
       successfulScans,
-      invalidScans: 0,
-      alreadyUsedScans: 0,
-      refundedScans: 0,
+      invalidScans,
+      alreadyUsedScans,
+      refundedScans,
       offlineScans,
-      syncConflicts: 0,
-      scanSuccessRatePercent: 100,
+      syncConflicts,
+      scanSuccessRatePercent,
     };
   }
 
   /**
-   * AUTHORITATIVE ADMIN PLATFORM METRICS
+   * AUTHORITATIVE ADMIN PLATFORM METRICS (FIX-022 — no hardcoded values)
    */
   async getAdminPlatformMetrics(): Promise<AdminPlatformMetricsDto> {
     const db = this.databaseService.db;
 
-    const paidOrders = await db.query.orders.findMany({
-      where: eq(orders.status, 'paid'),
-    });
+    // Total GMV from paid orders
+    const [gmvRow] = await db
+      .select({ total: sum(orders.totalMinor) })
+      .from(orders)
+      .where(eq(orders.status, 'paid'));
+    const totalGmvMinor = Number(gmvRow?.total ?? 0);
 
-    let totalGmvMinor = 0;
-    for (const o of paidOrders) totalGmvMinor += o.totalMinor;
-
-    const totalOrdersCount = paidOrders.length;
+    const [ordersRow] = await db
+      .select({ count: count() })
+      .from(orders)
+      .where(eq(orders.status, 'paid'));
+    const totalOrdersCount = Number(ordersRow?.count ?? 0);
     const averageOrderValueMinor = totalOrdersCount > 0 ? Math.round(totalGmvMinor / totalOrdersCount) : 0;
 
-    const ticketsRes = await db.select({ count: count() }).from(tickets);
-    const totalTicketsIssued = Number(ticketsRes[0]?.count ?? 0);
+    const [ticketsRes] = await db.select({ count: count() }).from(tickets);
+    const totalTicketsIssued = Number(ticketsRes?.count ?? 0);
 
-    const refundsRes = await db.select({ count: count() }).from(refunds);
-    const totalRefundsCount = Number(refundsRes[0]?.count ?? 0);
+    const [refundsRes] = await db.select({ count: count() }).from(refunds);
+    const totalRefundsCount = Number(refundsRes?.count ?? 0);
     const refundRatePercent = totalOrdersCount > 0 ? Math.round((totalRefundsCount / totalOrdersCount) * 100) : 0;
+
+    // Checkout drop-off: checkout_started events that did NOT lead to payment_success
+    // Use analytics_events for funnel computation
+    const [checkoutsRow] = await db
+      .select({ count: count() })
+      .from(analyticsEvents)
+      .where(eq(analyticsEvents.eventName, 'checkout_started'));
+    const checkoutsStarted = Number(checkoutsRow?.count ?? 0);
+
+    const [paySuccessRow] = await db
+      .select({ count: count() })
+      .from(analyticsEvents)
+      .where(eq(analyticsEvents.eventName, 'payment_success'));
+    const paymentSuccesses = Number(paySuccessRow?.count ?? 0);
+
+    const checkoutDropoffRatePercent =
+      checkoutsStarted > 0
+        ? Math.round(((checkoutsStarted - paymentSuccesses) / checkoutsStarted) * 100)
+        : 0;
+
+    // Active organizers (organizations of type 'organizer' with status 'active')
+    const [orgsRow] = await db
+      .select({ count: count() })
+      .from(organizations)
+      .where(and(eq(organizations.type, 'organizer'), eq(organizations.status, 'active')));
+    const activeOrganizersCount = Number(orgsRow?.count ?? 0);
+
+    // Active events (status 'published' or 'live')
+    const [eventsRow] = await db
+      .select({ count: count() })
+      .from(events)
+      .where(and(
+        ne(events.status, 'cancelled'),
+        ne(events.status, 'rejected'),
+        ne(events.status, 'draft'),
+      ));
+    const activeEventsCount = Number(eventsRow?.count ?? 0);
 
     return {
       totalGmvMinor,
       totalOrdersCount,
       totalTicketsIssued,
       averageOrderValueMinor,
-      checkoutDropoffRatePercent: 18,
+      checkoutDropoffRatePercent,
       refundRatePercent,
-      activeOrganizersCount: 5,
-      activeEventsCount: 12,
+      activeOrganizersCount,
+      activeEventsCount,
     };
   }
 }

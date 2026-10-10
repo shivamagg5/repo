@@ -3,27 +3,27 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '../../components/DashboardLayout';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import type { Event, EventStatus } from '@platform/types';
 
 export default function EventsListPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [timeTab, setTimeTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await apiClient.getOrganizerEvents<{ items: Event[]; nextCursor: string | null; hasMore: boolean }>();
-      setEvents(res.data.items ?? []);
+      setEvents(res?.data?.items ?? []);
+      setLastUpdated(new Date());
     } catch (err: any) {
-      if (err instanceof ApiError) {
-        setError(err.message || 'Failed to load organizer events');
-      } else {
-        setError(err?.message || 'Network error occurred while fetching events');
-      }
+      setError(err?.message ?? 'Failed to load organizer events');
     } finally {
       setLoading(false);
     }
@@ -34,8 +34,13 @@ export default function EventsListPage() {
   }, [fetchEvents]);
 
   const filteredEvents = events.filter((evt) => {
-    if (statusFilter === 'all') return true;
-    return evt.status === statusFilter;
+    const eventDate = new Date(evt.startsAt);
+    const now = new Date();
+    if (timeTab === 'upcoming' && eventDate < now && evt.status !== 'live') return false;
+    if (timeTab === 'past' && (eventDate >= now || evt.status === 'live')) return false;
+    if (statusFilter !== 'all' && evt.status !== statusFilter) return false;
+    if (searchQuery && !evt.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
   });
 
   const getStatusBadge = (status: EventStatus | string) => {
@@ -57,24 +62,77 @@ export default function EventsListPage() {
     }
   };
 
-  const statusTabs: Array<{ key: string; label: string }> = [
-    { key: 'all', label: 'All Events' },
-    { key: 'published', label: 'Published' },
+  const statusTabs = [
+    { key: 'all', label: 'All' },
     { key: 'live', label: 'Live' },
-    { key: 'draft', label: 'Drafts' },
+    { key: 'published', label: 'Published' },
     { key: 'submitted', label: 'In Review' },
-    { key: 'cancelled', label: 'Cancelled' },
+    { key: 'draft', label: 'Drafts' },
   ];
 
   return (
-    <DashboardLayout title="Events Management" subtitle="Create, edit, configure ticket tiers, and publish organizer events">
-      <div className="space-y-4">
+    <DashboardLayout
+      title="Events Catalog"
+      subtitle="Lifecycle management, ticketing tiers, and publishing pipeline"
+      actions={
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-slate-400">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={fetchEvents}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+          >
+            {loading ? 'Refreshing...' : '↻ Refresh'}
+          </button>
+          <Link
+            href="/events/new"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg shadow-purple-900/30 hover:brightness-110 transition-all flex items-center gap-1.5"
+          >
+            + New Event
+          </Link>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {error && (
+          <div className="p-4 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex justify-between items-center">
+            <span>{error}</span>
+            <button type="button" onClick={fetchEvents} className="font-bold underline ml-2">
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Header Action & Filter Bar */}
         <div className="flex flex-wrap justify-between items-center bg-slate-900/60 p-4 rounded-xl border border-slate-800 gap-3">
+          {/* Upcoming / Past toggle */}
+          <div className="flex gap-1.5">
+            {(['upcoming', 'past'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTimeTab(t)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-all capitalize ${
+                  timeTab === t
+                    ? 'bg-purple-600/30 text-purple-300 border-purple-500/40'
+                    : 'bg-slate-800/40 text-slate-400 hover:text-slate-200 border-transparent'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap gap-1.5">
             {statusTabs.map((tab) => (
               <button
                 key={tab.key}
+                type="button"
                 onClick={() => setStatusFilter(tab.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   statusFilter === tab.key
@@ -86,95 +144,85 @@ export default function EventsListPage() {
               </button>
             ))}
           </div>
-          <Link
-            href="/events/new"
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-xs font-bold shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
-          >
-            <span>+</span> New Event Workflow
-          </Link>
         </div>
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-56 bg-slate-900/50 rounded-xl border border-slate-800 animate-pulse" />
-            ))}
-          </div>
-        ) : error ? (
-          /* Error State with Retry */
-          <div className="glass-panel p-8 rounded-2xl border border-red-900/40 text-center max-w-md mx-auto my-8">
-            <p className="text-sm text-red-400 mb-4">{error}</p>
-            <button
-              onClick={fetchEvents}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
-            >
-              Retry Loading Events
-            </button>
+        {/* Events Grid */}
+        {loading && events.length === 0 ? (
+          <div className="text-center py-16 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-8 text-slate-400 text-xs">
+            Loading events catalog...
           </div>
         ) : filteredEvents.length === 0 ? (
-          /* Empty State */
-          <div className="glass-panel p-12 rounded-2xl border border-slate-800 text-center max-w-lg mx-auto my-8">
-            <div className="w-12 h-12 rounded-full bg-purple-950/60 border border-purple-800 flex items-center justify-center mx-auto mb-4 text-purple-400 text-xl">
-              🎪
-            </div>
-            <h3 className="text-base font-bold text-white mb-1">
-              {statusFilter === 'all' ? 'No Events Found' : `No ${statusFilter} Events`}
-            </h3>
-            <p className="text-xs text-slate-400 mb-6">
-              {statusFilter === 'all'
-                ? 'Your organization has not published any events yet. Start the publication workflow now.'
-                : `There are currently no events matching the '${statusFilter}' filter.`}
+          <div className="text-center py-16 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-8">
+            <p className="text-base font-semibold text-slate-300 mb-1">No events found</p>
+            <p className="text-xs text-slate-500 mb-6">
+              {searchQuery ? `No matches for "${searchQuery}"` : 'Get started by creating your first event.'}
             </p>
             <Link
               href="/events/new"
-              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-xs font-bold shadow-lg hover:brightness-110 transition-all inline-block"
+              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all inline-flex items-center gap-2"
             >
-              + Create New Event
+              Create First Event
             </Link>
           </div>
         ) : (
-          /* Events Grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredEvents.map((evt) => (
               <div
                 key={evt.id}
-                className="glass-panel p-5 rounded-xl border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between"
+                className="group relative bg-[#161922] border border-slate-800/80 hover:border-purple-500/40 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-purple-950/20 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${getStatusBadge(evt.status)}`}>
-                      {evt.status}
-                    </span>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {new Date(evt.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
+                  {/* Card Header */}
+                  <div className="h-36 bg-gradient-to-tr from-slate-900 via-purple-950/30 to-slate-900 border-b border-slate-800/80 relative p-4 flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${getStatusBadge(
+                          evt.status,
+                        )}`}
+                      >
+                        {evt.status}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] font-mono text-purple-300 font-semibold block mb-0.5">
+                        {evt.startsAt
+                          ? new Date(evt.startsAt).toLocaleDateString('en-IN', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : 'Date TBA'}
+                      </span>
+                      <h3 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors line-clamp-1">
+                        {evt.title}
+                      </h3>
+                    </div>
                   </div>
 
-                  <h3 className="font-bold text-slate-100 text-base mb-1 line-clamp-1">{evt.title}</h3>
-                  <p className="text-xs text-slate-400 mb-4 font-mono truncate">ID: {evt.id}</p>
+                  {/* Details */}
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs text-slate-400 line-clamp-2">
+                      {evt.description || 'No description provided.'}
+                    </p>
 
-                  <div className="space-y-1.5 text-xs text-slate-300">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Capacity Config</span>
-                      <span className="font-semibold">{evt.capacity ? `${evt.capacity} total seats` : 'Open capacity'}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Timezone</span>
-                      <span className="font-mono text-slate-400">{evt.timezone}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                      <span>Venue</span>
+                      <span className="text-slate-200 font-medium">
+                        {(evt as any).venueName ?? (evt as any).venue?.name ?? 'Main Arena'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    Created {new Date(evt.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </span>
+                {/* Footer Controls */}
+                <div className="p-4 pt-0">
                   <Link
                     href={`/events/${evt.id}`}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                    className="w-full py-2.5 rounded-xl bg-slate-800/60 hover:bg-purple-600/20 text-slate-300 hover:text-purple-300 border border-slate-700/60 hover:border-purple-500/40 text-xs font-semibold transition-all flex items-center justify-center gap-2"
                   >
-                    Command Center →
+                    <span>Manage Event</span>
+                    <span>→</span>
                   </Link>
                 </div>
               </div>

@@ -1,19 +1,36 @@
 // =============================================================================
 // consumer-web — Consumer Profile & Account Settings
-// Real user profile, verification status, and security settings.
+// Real user profile, dynamic tier, edit profile (name & phone), and security settings.
 // =============================================================================
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 import { Navbar } from '../../components/Navbar';
 import { Footer } from '../../components/Footer';
+import { apiClient } from '../../lib/api';
 
 export default function ConsumerProfilePage() {
   const router = useRouter();
   const { user, profile, status, logout } = useAuth();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile) {
+      setNameInput(profile.name || user?.user_metadata?.['name'] || '');
+      setPhoneInput(profile.phone || '');
+    } else if (user) {
+      setNameInput(user.user_metadata?.['name'] || user.email?.split('@')[0] || '');
+    }
+  }, [profile, user]);
 
   if (status === 'loading') {
     return (
@@ -32,8 +49,35 @@ export default function ConsumerProfilePage() {
     return null;
   }
 
-  const displayName = profile?.name || user?.user_metadata?.['name'] || user?.email?.split('@')[0] || 'User';
+  const displayName = nameInput || profile?.name || user?.user_metadata?.['name'] || user?.email?.split('@')[0] || 'User';
   const initial = displayName.charAt(0).toUpperCase();
+
+  const accountTier = profile?.role
+    ? `${profile.role.charAt(0).toUpperCase() + profile.role.slice(1)} Passholder`
+    : user?.user_metadata?.['role']
+    ? `${user.user_metadata['role']} Account`
+    : 'Verified Consumer Attendee';
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      await apiClient.updateUserProfile({
+        name: nameInput.trim() || undefined,
+        phone: phoneInput.trim() || undefined,
+      });
+      setSaveSuccess(true);
+      setIsEditing(false);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err: any) {
+      setSaveError(err?.message || 'Failed to update profile details.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0C10] text-slate-100 flex flex-col justify-between">
@@ -57,14 +101,83 @@ export default function ConsumerProfilePage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="px-5 py-2.5 rounded-xl bg-red-950/40 text-red-400 border border-red-800/60 hover:bg-red-900/50 text-xs font-bold transition-colors"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors"
+            >
+              {isEditing ? 'Cancel Edit' : 'Edit Profile'}
+            </button>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="px-5 py-2.5 rounded-xl bg-red-950/40 text-red-400 border border-red-800/60 hover:bg-red-900/50 text-xs font-bold transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
+
+        {/* Success Alert */}
+        {saveSuccess && (
+          <div className="p-4 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+            <span>✅</span> Profile updated successfully!
+          </div>
+        )}
+
+        {/* Edit Form Modal/Card */}
+        {isEditing && (
+          <form
+            onSubmit={handleSaveProfile}
+            className="glass-surface p-6 sm:p-8 rounded-3xl border border-purple-500/40 space-y-4 bg-[#12151D]/90 animate-fadeIn"
+          >
+            <h2 className="text-base font-bold text-white">Edit Your Details</h2>
+            {saveError && (
+              <p className="text-xs text-red-400 bg-red-950/40 border border-red-800/60 p-2.5 rounded-xl">
+                {saveError}
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Enter full name"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Mobile Phone (with country code)</label>
+                <input
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full bg-gray-900 border border-gray-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 text-xs font-semibold hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Quick Links Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -110,11 +223,11 @@ export default function ConsumerProfilePage() {
             </div>
             <div className="p-4 rounded-xl bg-gray-900/60 border border-gray-800">
               <span className="text-gray-400 block mb-1">Mobile Phone</span>
-              <p className="font-mono text-gray-200">{profile?.phone ?? 'Not registered'}</p>
+              <p className="font-mono text-gray-200">{phoneInput || profile?.phone || 'Not registered'}</p>
             </div>
             <div className="p-4 rounded-xl bg-gray-900/60 border border-gray-800">
               <span className="text-gray-400 block mb-1">Account Tier</span>
-              <p className="font-semibold text-emerald-400">Verified Consumer Attendee</p>
+              <p className="font-semibold text-emerald-400">{accountTier}</p>
             </div>
           </div>
         </div>

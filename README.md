@@ -12,8 +12,8 @@ event-platform/ (monorepo — pnpm workspaces)
 │   ├── venue-web/           # Next.js 15 — Venue management
 │   ├── promoter-web/        # Next.js 15 — Promoter dashboard
 │   ├── admin-web/           # Next.js 15 — Admin operations
-│   ├── consumer-mobile/     # Flutter — Consumer iOS/Android app
-│   └── scanner-mobile/      # Flutter — Staff ticket scanner app
+│   ├── consumer-android/    # Native Android (Kotlin + Jetpack Compose) — Consumer app
+│   └── scanner-android/     # Native Android (Kotlin + CameraX) — Gate staff ticket scanner
 │
 ├── backend/
 │   └── api/                 # NestJS — Central API (modular monolith)

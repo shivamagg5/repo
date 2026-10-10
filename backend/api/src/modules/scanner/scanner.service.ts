@@ -5,8 +5,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { eq, and, sql, or, ilike } from 'drizzle-orm';
+import * as crypto from 'crypto';
 import { DatabaseService } from '../../database/database.service';
 import {
   checkinDevices,
@@ -17,8 +19,11 @@ import {
   orders,
   ticketTypes,
   users,
+  organizationMembers,
+  scannerPairingTokens,
 } from '../../database/schema';
 import { ScannerCryptoService } from './scanner-crypto.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type {
   DeviceRegisterInput,
   DeviceRegisterResultDto,
@@ -29,19 +34,109 @@ import type {
   BatchSyncScansInput,
   BatchSyncScansResultDto,
   AttendeeSearchResultDto,
+  ScannerDeviceHeartbeatDto,
+  ScannerHeartbeatInput,
 } from '@platform/types';
 
 @Injectable()
 export class ScannerService {
   private readonly logger = new Logger(ScannerService.name);
+  private readonly activeHeartbeats = new Map<string, ScannerDeviceHeartbeatDto>();
 
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly cryptoService: ScannerCryptoService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   private get db() {
     return this.databaseService.db;
+  }
+
+  /**
+   * Resolve active organization membership for a staff user.
+   * If requestedOrgId is passed (advisory selector), verify active membership in that org.
+   * Otherwise, return the first active organization membership.
+   */
+  async resolveStaffOrgId(staffUserId: string, requestedOrgId?: string): Promise<string> {
+    const memberships = await this.db.query.organizationMembers.findMany({
+      where: and(
+        eq(organizationMembers.userId, staffUserId),
+        eq(organizationMembers.status, 'active'),
+      ),
+    });
+
+    if (!memberships || memberships.length === 0) {
+      throw new ForbiddenException({
+        code: 'NO_ACTIVE_ORG_MEMBERSHIP',
+        message: 'Authenticated user has no active organization memberships.',
+      });
+    }
+
+    if (requestedOrgId) {
+      const match = memberships.find((m: any) => m.organizationId === requestedOrgId);
+      if (!match) {
+        throw new ForbiddenException({
+          code: 'ORG_MEMBERSHIP_FORBIDDEN',
+          message: 'Authenticated user is not an active member of the requested organization.',
+        });
+      }
+      return match.organizationId;
+    }
+
+    const primary = memberships[0];
+    if (!primary) {
+      throw new ForbiddenException({
+        code: 'NO_ACTIVE_ORG_MEMBERSHIP',
+        message: 'Authenticated user has no active organization memberships.',
+      });
+    }
+    return primary.organizationId;
+  }
+
+  /**
+   * Resolve active organization membership for a staff user for a specific event.
+   * Verifies that the staff user belongs to the organization that owns the event.
+   */
+  async resolveStaffOrgForEvent(staffUserId: string, eventId: string, requestedOrgId?: string): Promise<string> {
+    const event = await this.db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    const memberships = await this.db.query.organizationMembers.findMany({
+      where: and(
+        eq(organizationMembers.userId, staffUserId),
+        eq(organizationMembers.status, 'active'),
+      ),
+    });
+
+    if (!memberships || memberships.length === 0) {
+      throw new ForbiddenException({
+        code: 'NO_ACTIVE_ORG_MEMBERSHIP',
+        message: 'Authenticated user has no active organization memberships.',
+      });
+    }
+
+    const hasOrgAccess = memberships.some((m: any) => m.organizationId === event.organizerOrganizationId);
+    if (!hasOrgAccess) {
+      throw new ForbiddenException({
+        code: 'EVENT_ORG_ACCESS_DENIED',
+        message: 'Staff user is not a member of the organization that owns this event.',
+      });
+    }
+
+    if (requestedOrgId && requestedOrgId !== event.organizerOrganizationId) {
+      throw new ForbiddenException({
+        code: 'EVENT_ORG_MISMATCH',
+        message: 'Requested organization does not own this event.',
+      });
+    }
+
+    return event.organizerOrganizationId;
   }
 
   /**
@@ -176,6 +271,19 @@ export class ScannerService {
 
     const signature = this.cryptoService.signEventAuthorizationPackage(rawPackage);
 
+    this.activeHeartbeats.set(device.id, {
+      deviceId: device.id,
+      deviceIdentifier: device.deviceIdentifier,
+      eventId: event.id,
+      gateId: gate.id,
+      batteryLevel: 100,
+      isCharging: false,
+      offlineQueueDepth: 0,
+      networkLatencyMs: 25,
+      appVersion: '1.0.0',
+      lastSeenAt: issuedAt.toISOString(),
+    });
+
     return {
       ...rawPackage,
       packageSignature: signature,
@@ -193,6 +301,8 @@ export class ScannerService {
     deviceId: string,
     staffUserId: string,
     syncId?: string,
+    credentialIssuedAt?: string,
+    qrPayload?: string,
   ): Promise<ScanTicketResultDto> {
     return await this.db.transaction(async (tx: any) => {
       // 1. Lock target ticket row FOR UPDATE to guarantee concurrency isolation
@@ -204,10 +314,26 @@ export class ScannerService {
 
       if (!ticket) {
         return {
-          result: 'wrong_event',
+          result: 'invalid',
+          ticketId,
           scannedAt: new Date().toISOString(),
-          message: 'Ticket not found or does not belong to this event',
+          message: 'Ticket not found in event database',
         };
+      }
+
+      // Check if ticket QR was reissued/revoked
+      if (credentialIssuedAt && ticket.issuedAt) {
+        const credTime = new Date(credentialIssuedAt).getTime();
+        const ticketIssuedTime = new Date(ticket.issuedAt).getTime();
+        // Reject outdated credentials (permits 1s drift for db timestamp rounding)
+        if (credTime < ticketIssuedTime - 1000) {
+          return {
+            result: 'invalid',
+            ticketId,
+            scannedAt: new Date().toISOString(),
+            message: 'Ticket QR credential has been reissued or revoked. Please present latest ticket.',
+          };
+        }
       }
 
       // Fetch ticket type name and purchaser details for UI response
@@ -239,6 +365,17 @@ export class ScannerService {
           scannedAt,
           serverRecordedAt: new Date(),
           syncId: actualSyncId,
+        });
+
+        this.realtime?.publishScanEvent(eventId, {
+          eventId,
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          tierName: ticketType?.name ?? 'General Admission',
+          attendeeName: userRecord?.name ?? 'Attendee',
+          gate: gateId ?? 'Main Gate',
+          scannedAt: scannedAt.toISOString(),
+          status: 'duplicate',
         });
 
         return {
@@ -283,6 +420,17 @@ export class ScannerService {
         scannedAt,
         serverRecordedAt: new Date(),
         syncId: actualSyncId,
+      });
+
+      this.realtime?.publishScanEvent(eventId, {
+        eventId,
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        tierName: ticketType?.name ?? 'Standard Entry',
+        attendeeName: userRecord?.name ?? 'Attendee',
+        gate: gateId ?? 'Main Gate',
+        scannedAt: scannedAt.toISOString(),
+        status: 'admitted',
       });
 
       return {
@@ -330,6 +478,9 @@ export class ScannerService {
       input.gateId,
       input.deviceId,
       staffUserId,
+      undefined,
+      cryptoResult.payload.issuedAt,
+      input.qrPayload,
     );
   }
 
@@ -374,6 +525,8 @@ export class ScannerService {
           rec.deviceId,
           staffUserId,
           rec.syncId,
+          cryptoRes.payload.issuedAt,
+          rec.qrPayload,
         );
 
         if (scanRes.result === 'success') {
@@ -437,4 +590,158 @@ export class ScannerService {
       checkedInAt: t.checkedInAt ? t.checkedInAt.toISOString() : null,
     }));
   }
+
+  /**
+   * Onboard a scanner device using a single-use 10-minute pairing token.
+   */
+  async onboardScanner(
+    input: { pairingCode: string; deviceName: string; deviceFingerprint: string; publicKeyPem: string },
+    staffUserId: string,
+  ): Promise<{
+    deviceId: string;
+    deviceIdentifier: string;
+    package: EventAuthorizationPackageDto;
+  }> {
+    const codeClean = input.pairingCode.toUpperCase().trim();
+    const hash = crypto.createHash('sha256').update(codeClean).digest('hex');
+
+    const token = await this.db.query.scannerPairingTokens.findFirst({
+      where: eq(scannerPairingTokens.pairingCodeHash, hash),
+    });
+
+    if (!token) {
+      throw new BadRequestException({
+        code: 'INVALID_PAIRING_CODE',
+        message: 'Invalid or unrecognized pairing code.',
+      });
+    }
+
+    if (token.status !== 'active' || (token.expiresAt && token.expiresAt < new Date())) {
+      throw new BadRequestException({
+        code: 'EXPIRED_PAIRING_CODE',
+        message: 'This pairing code has expired or has already been used.',
+      });
+    }
+
+    // Register or find device under the token's organization
+    const registered = await this.registerDevice(
+      {
+        deviceIdentifier: input.deviceFingerprint,
+        publicKeyPem: input.publicKeyPem,
+      },
+      token.organizationId,
+    );
+
+    // Mark token as used
+    await this.db
+      .update(scannerPairingTokens)
+      .set({
+        status: 'used',
+        usedAt: new Date(),
+        usedByDeviceId: registered.deviceId,
+      })
+      .where(eq(scannerPairingTokens.id, token.id));
+
+    // Resolve or fallback gate
+    let targetGateId = token.gateId;
+    if (!targetGateId) {
+      const existingGate = await this.db.query.checkinGates.findFirst({
+        where: and(eq(checkinGates.eventId, token.eventId), eq(checkinGates.status, 'active')),
+      });
+      if (!existingGate) {
+        const inserted = await this.db
+          .insert(checkinGates)
+          .values({
+            eventId: token.eventId,
+            name: 'Main Gate',
+            status: 'active',
+          })
+          .returning();
+        if (!inserted[0]) {
+          throw new BadRequestException('Failed to initialize gate for event check-in');
+        }
+        targetGateId = inserted[0].id;
+      } else {
+        targetGateId = existingGate.id;
+      }
+    }
+
+    // Generate signed event authorization package
+    const authPackage = await this.pairDevice(
+      {
+        deviceId: registered.deviceId,
+        eventId: token.eventId,
+        gateId: targetGateId,
+      },
+      staffUserId,
+      token.organizationId,
+    );
+
+    return {
+      deviceId: registered.deviceId,
+      deviceIdentifier: registered.deviceIdentifier,
+      package: authPackage,
+    };
+  }
+
+  /**
+   * Record periodic hardware heartbeat from a turnstile scanner terminal.
+   */
+  async recordHeartbeat(input: ScannerHeartbeatInput): Promise<ScannerDeviceHeartbeatDto> {
+    const device = await this.db.query.checkinDevices.findFirst({
+      where: eq(checkinDevices.id, input.deviceId),
+    });
+
+    if (!device) {
+      throw new NotFoundException({
+        code: 'DEVICE_NOT_FOUND',
+        message: `Scanner device with ID ${input.deviceId} does not exist.`,
+      });
+    }
+
+    const now = new Date();
+    await this.db
+      .update(checkinDevices)
+      .set({
+        lastSeenAt: now,
+      })
+      .where(eq(checkinDevices.id, device.id));
+
+    const heartbeat: ScannerDeviceHeartbeatDto = {
+      deviceId: device.id,
+      deviceIdentifier: input.deviceIdentifier ?? device.deviceIdentifier,
+      eventId: input.eventId,
+      gateId: input.gateId,
+      batteryLevel: input.batteryLevel ?? 100,
+      isCharging: input.isCharging ?? false,
+      offlineQueueDepth: input.offlineQueueDepth ?? 0,
+      networkLatencyMs: input.networkLatencyMs ?? 20,
+      appVersion: input.appVersion ?? '1.0.0',
+      lastSeenAt: now.toISOString(),
+    };
+
+    this.activeHeartbeats.set(device.id, heartbeat);
+    return heartbeat;
+  }
+
+  /**
+   * Retrieve active scanner terminals reporting for an event.
+   */
+  async getEventDevices(eventId: string): Promise<ScannerDeviceHeartbeatDto[]> {
+    const event = await this.db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    const devices: ScannerDeviceHeartbeatDto[] = [];
+    for (const hb of this.activeHeartbeats.values()) {
+      if (hb.eventId === eventId) {
+        devices.push(hb);
+      }
+    }
+    return devices;
+  }
 }
+

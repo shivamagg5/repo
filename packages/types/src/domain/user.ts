@@ -19,6 +19,7 @@ export interface UserProfile {
   phone: string | null;
   avatarUrl: string | null;
   status: UserStatus;
+  role?: string | null;
   createdAt: string;
 }
 

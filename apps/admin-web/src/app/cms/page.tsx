@@ -36,7 +36,7 @@ export default function AdminCmsPage() {
     setError(null);
     try {
       const [bannersRes, featuredRes] = await Promise.allSettled([
-        apiClient.getCmsBanners<any>(),
+        apiClient.getAdminCmsBanners<any>(),
         apiClient.getCmsFeaturedEvents<any>(),
       ]);
 
@@ -67,11 +67,18 @@ export default function AdminCmsPage() {
     setSavingBanner(true);
     setBannerError(null);
     try {
+      const validTargetUrl = bannerLinkUrl.trim().startsWith('http')
+        ? bannerLinkUrl.trim()
+        : bannerLinkUrl.trim()
+          ? `https://${bannerLinkUrl.trim()}`
+          : 'https://pulsr.live/events';
+
       await apiClient.createCmsBanner({
         title: bannerTitle.trim(),
         imageUrl: bannerImageUrl.trim(),
-        linkUrl: bannerLinkUrl.trim() || undefined,
-        sortOrder: parseInt(bannerSortOrder, 10) || 0,
+        targetUrl: validTargetUrl,
+        displayOrder: parseInt(bannerSortOrder, 10) || 0,
+        status: 'published',
       });
 
       setShowBannerModal(false);
@@ -90,6 +97,16 @@ export default function AdminCmsPage() {
     }
   };
 
+  const handleDeleteBanner = async (bannerId: string) => {
+    if (!confirm('Are you sure you want to remove this banner?')) return;
+    try {
+      await apiClient.deleteCmsBanner(bannerId);
+      await fetchCmsData();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete banner.');
+    }
+  };
+
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!colName.trim()) return;
@@ -98,9 +115,10 @@ export default function AdminCmsPage() {
     setColError(null);
     try {
       await apiClient.createCmsCollection({
-        name: colName.trim(),
+        title: colName.trim(),
         slug: (colSlug.trim() || colName.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-|-$/g, ''),
         description: colDesc.trim() || undefined,
+        status: 'published',
       });
 
       setShowCollectionModal(false);
@@ -171,13 +189,34 @@ export default function AdminCmsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {banners.map((b) => (
-                <div key={b.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div key={b.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2 relative group">
                   <div className="flex justify-between items-start">
-                    <p className="font-bold text-sm text-white truncate">{b.title}</p>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Order: {b.sortOrder ?? 0}</span>
+                    <p className="font-bold text-sm text-white truncate pr-2">{b.title}</p>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                        b.status === 'published' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {b.status || 'draft'}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                        #{b.displayOrder ?? b.sortOrder ?? 0}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono truncate">Image: {b.imageUrl}</p>
-                  {b.linkUrl && <p className="text-[11px] text-purple-400 font-mono truncate">Link: {b.linkUrl}</p>}
+                  {(b.targetUrl || b.linkUrl) && (
+                    <p className="text-[11px] text-purple-400 font-mono truncate">
+                      Link: {b.targetUrl || b.linkUrl}
+                    </p>
+                  )}
+                  <div className="pt-2 border-t border-slate-800/60 flex justify-end">
+                    <button
+                      onClick={() => handleDeleteBanner(b.id)}
+                      className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Delete Banner
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

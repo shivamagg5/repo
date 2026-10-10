@@ -13,11 +13,13 @@ export interface VenueLayoutProps {
 }
 
 const NAV_ITEMS = [
-  { href: '/',         label: 'Overview',     icon: '🏛️' },
-  { href: '/profile',  label: 'Venue Profile', icon: '📍' },
-  { href: '/calendar', label: 'Calendar',      icon: '📅' },
-  { href: '/events',   label: 'Hosted Events', icon: '🎪' },
-  { href: '/staff',    label: 'Staff',         icon: '👥' },
+  { href: '/',         label: 'Overview',        icon: '🏛️' },
+  { href: '/tables',   label: 'Floor & Tables',  icon: '🍾' },
+  { href: '/door',     label: 'Door & Capacity', icon: '🚪' },
+  { href: '/profile',  label: 'Venue Profile',   icon: '📍' },
+  { href: '/calendar', label: 'Calendar',        icon: '📅' },
+  { href: '/events',   label: 'Hosted Events',   icon: '🎪' },
+  { href: '/staff',    label: 'Staff',           icon: '👥' },
 ];
 
 export function VenueLayout({ children, title = 'Dashboard', subtitle, actions }: VenueLayoutProps) {

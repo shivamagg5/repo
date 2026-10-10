@@ -1,4 +1,15 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -36,4 +47,43 @@ export class UsersController {
   ) {
     return this.usersService.updateProfile(user.userId, body);
   }
+
+  /**
+   * GET /api/v1/users/me/favorites
+   * Returns authenticated user's saved/bookmarked events.
+   */
+  @Get('me/favorites')
+  @UseGuards(AuthGuard)
+  getFavorites(@CurrentUser() user: AuthContext) {
+    return this.usersService.getFavorites(user.userId);
+  }
+
+  /**
+   * POST /api/v1/users/me/favorites/:eventId
+   * Adds an event to user's saved favorites.
+   */
+  @Post('me/favorites/:eventId')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.OK)
+  addFavorite(
+    @CurrentUser() user: AuthContext,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.usersService.addFavorite(user.userId, eventId);
+  }
+
+  /**
+   * DELETE /api/v1/users/me/favorites/:eventId
+   * Removes an event from user's saved favorites.
+   */
+  @Delete('me/favorites/:eventId')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.OK)
+  removeFavorite(
+    @CurrentUser() user: AuthContext,
+    @Param('eventId') eventId: string,
+  ) {
+    return this.usersService.removeFavorite(user.userId, eventId);
+  }
 }
+

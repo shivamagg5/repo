@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { EventsService } from './events.service';
@@ -70,4 +70,24 @@ export class PublicEventsController {
 
     return this.eventsService.listCategories();
   }
+
+  @Public()
+  @Get('cities')
+  async listCities(
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    if (res) {
+      res.setHeader('Cache-Control', this.cacheService.getPublicCacheControlHeader(300, 1800));
+    }
+
+    return this.eventsService.listCities();
+  }
+
+  @Public()
+  @Post('newsletter/subscribe')
+  @HttpCode(HttpStatus.OK)
+  async subscribeNewsletter(@Body() body: { email: string; source?: string }) {
+    return this.eventsService.subscribeNewsletter(body?.email, body?.source);
+  }
 }
+

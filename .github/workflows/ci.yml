@@ -13,7 +13,6 @@ concurrency:
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '10.13.1'
-  FLUTTER_VERSION: '3.41.6'
 
 jobs:
   # ============================================================================
@@ -191,34 +190,30 @@ jobs:
         run: pnpm --filter ${{ matrix.app }} build
 
   # ============================================================================
-  # Flutter analyze — Consumer mobile
+  # Native Android Test & Build — Consumer & Scanner
   # ============================================================================
-  analyze-flutter:
-    name: Analyze — Flutter Apps
+  test-android:
+    name: Test — Android Apps
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [consumer-mobile, scanner-mobile]
+        app: [consumer-android, scanner-android]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
 
-      - name: Flutter pub get — ${{ matrix.app }}
-        run: flutter pub get
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
         working-directory: apps/${{ matrix.app }}
 
-      - name: Flutter analyze — ${{ matrix.app }}
-        run: flutter analyze
-        working-directory: apps/${{ matrix.app }}
-
-      - name: Flutter test — ${{ matrix.app }}
-        run: flutter test
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
         working-directory: apps/${{ matrix.app }}
 
   # ============================================================================
@@ -258,7 +253,7 @@ jobs:
       - lint-typecheck
       - test-node
       - build-backend
-      - analyze-flutter
+      - test-android
     if: always()
     steps:
       - name: Check all required jobs passed
@@ -266,5 +261,5 @@ jobs:
           if [ "${{ needs.lint-typecheck.result }}" != "success" ]; then exit 1; fi
           if [ "${{ needs.test-node.result }}" != "success" ]; then exit 1; fi
           if [ "${{ needs.build-backend.result }}" != "success" ]; then exit 1; fi
-          if [ "${{ needs.analyze-flutter.result }}" != "success" ]; then exit 1; fi
+          if [ "${{ needs.test-android.result }}" != "success" ]; then exit 1; fi
           echo "All CI checks passed."

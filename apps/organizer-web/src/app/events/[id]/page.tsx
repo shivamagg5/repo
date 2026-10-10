@@ -21,6 +21,18 @@ export default function EventCommandCenterPage() {
   const [orders, setOrders] = useState<OrganizerOrderDto[]>([]);
   const [promoters, setPromoters] = useState<any[]>([]);
 
+  // High-traffic virtual waiting room & queue state
+  const [queueStatus, setQueueStatus] = useState<{
+    enabled: boolean;
+    queueLength: number;
+    admittedCount: number;
+    activeTokens: number;
+    maxBatchAdmitSize: number;
+    batchAdmitIntervalSec: number;
+  } | null>(null);
+  const [queueActionLoading, setQueueActionLoading] = useState(false);
+  const [queueActionMessage, setQueueActionMessage] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -38,6 +50,57 @@ export default function EventCommandCenterPage() {
     minPerOrder: 1,
     maxPerOrder: 10,
   });
+
+  // Edit Event Details Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    startsAt: '',
+    endsAt: '',
+    timezone: 'Asia/Kolkata',
+    ageRestriction: '18+',
+  });
+
+  const openEditModal = () => {
+    if (dashboard) {
+      setEditForm({
+        title: dashboard.title || '',
+        description: '',
+        startsAt: dashboard.startsAt ? new Date(dashboard.startsAt).toISOString().slice(0, 16) : '',
+        endsAt: dashboard.endsAt ? new Date(dashboard.endsAt).toISOString().slice(0, 16) : '',
+        timezone: 'Asia/Kolkata',
+        ageRestriction: '18+',
+      });
+    }
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await apiClient.updateEvent(eventId, {
+        title: editForm.title.trim() || undefined,
+        description: editForm.description.trim() || undefined,
+        startsAt: editForm.startsAt ? new Date(editForm.startsAt).toISOString() : undefined,
+        endsAt: editForm.endsAt ? new Date(editForm.endsAt).toISOString() : undefined,
+        timezone: editForm.timezone || undefined,
+        ageRestriction: editForm.ageRestriction.trim() || undefined,
+      });
+      setShowEditModal(false);
+      await fetchEventData();
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setActionError(err.message || 'Failed to update event details.');
+      } else {
+        setActionError(err?.message || 'Failed to update event.');
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchEventData = useCallback(async () => {
     if (!eventId) return;
@@ -67,9 +130,70 @@ export default function EventCommandCenterPage() {
     }
   }, [eventId]);
 
+  const fetchQueueStatus = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await apiClient.get<any>(`/queue/${eventId}/status`);
+      if (res.data) {
+        setQueueStatus(res.data);
+      }
+    } catch {
+      // Default initial state
+      setQueueStatus({
+        enabled: false,
+        queueLength: 0,
+        admittedCount: 0,
+        activeTokens: 0,
+        maxBatchAdmitSize: 50,
+        batchAdmitIntervalSec: 5,
+      });
+    }
+  }, [eventId]);
+
   useEffect(() => {
     fetchEventData();
-  }, [fetchEventData]);
+    fetchQueueStatus();
+  }, [fetchEventData, fetchQueueStatus]);
+
+  const handleToggleQueue = async () => {
+    if (!queueStatus) return;
+    setQueueActionLoading(true);
+    setQueueActionMessage(null);
+    try {
+      const nextEnabled = !queueStatus.enabled;
+      await apiClient.post(`/queue/${eventId}/configure`, {
+        enabled: nextEnabled,
+        maxBatchAdmitSize: queueStatus.maxBatchAdmitSize,
+        batchAdmitIntervalSec: queueStatus.batchAdmitIntervalSec,
+        tokenTtlMinutes: 10,
+      });
+      setQueueStatus((prev) => (prev ? { ...prev, enabled: nextEnabled } : null));
+      setQueueActionMessage(
+        nextEnabled
+          ? 'Virtual Waiting Room is now LIVE! High-traffic ticket drop protection engaged.'
+          : 'Virtual Waiting Room paused. Direct inventory reservation enabled.'
+      );
+    } catch (err: any) {
+      setQueueActionMessage(err?.message || 'Failed to update virtual queue state.');
+    } finally {
+      setQueueActionLoading(false);
+    }
+  };
+
+  const handleAdmitBatch = async (batchSize = 50) => {
+    setQueueActionLoading(true);
+    setQueueActionMessage(null);
+    try {
+      const res = await apiClient.post<any>(`/queue/${eventId}/admit-batch`, { batchSize });
+      const count = res.data?.admittedCount ?? batchSize;
+      setQueueActionMessage(`Successfully admitted batch of ${count} waiting fans!`);
+      await fetchQueueStatus();
+    } catch (err: any) {
+      setQueueActionMessage(err?.message || 'Failed to admit batch.');
+    } finally {
+      setQueueActionLoading(false);
+    }
+  };
 
   const handleStateTransition = async (action: 'submit' | 'publish' | 'unpublish' | 'cancel') => {
     setActionLoading(true);
@@ -207,6 +331,14 @@ export default function EventCommandCenterPage() {
 
             {/* Authoritative State Transition Action Buttons */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openEditModal}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1.5"
+              >
+                <span>✏️</span> Edit Details
+              </button>
               {dashboard.status === 'draft' && (
                 <button
                   onClick={() => handleStateTransition('submit')}
@@ -337,6 +469,113 @@ export default function EventCommandCenterPage() {
                 </table>
               </div>
             )}
+          </div>
+
+          {/* Virtual Waiting Room & High-Traffic Queue Engine */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-gradient-to-br from-[#120F24]/80 to-[#0A0910] space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">⚡</span>
+                  <h3 className="text-lg font-black text-white font-['Outfit']">
+                    Virtual Waiting Room & Fair Queue Engine
+                  </h3>
+                  {queueStatus?.enabled ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#A3F736]/15 text-[#A3F736] border border-[#A3F736]/30 flex items-center gap-1.5 shadow-[0_0_12px_rgba(163,247,54,0.25)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#A3F736] animate-ping" />
+                      QUEUE ACTIVE
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700">
+                      STANDBY (DIRECT SALES)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Fair FIFO admission queue with cryptographic bot defense and tamper-proof HMAC reservation tokens.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleToggleQueue}
+                  disabled={queueActionLoading}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    queueStatus?.enabled
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                      : 'bg-gradient-to-r from-[#FF2E93] to-[#FF5E1E] text-white shadow-[0_0_16px_rgba(255,46,147,0.3)] hover:opacity-95'
+                  }`}
+                >
+                  {queueActionLoading ? (
+                    'Processing...'
+                  ) : queueStatus?.enabled ? (
+                    '⏸ Pause Queue'
+                  ) : (
+                    '⚡ Engage Waiting Room'
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleAdmitBatch(50)}
+                  disabled={queueActionLoading || !queueStatus?.enabled}
+                  className="px-4 py-2 bg-gradient-to-r from-[#00F0FF]/20 to-purple-600/30 hover:from-[#00F0FF]/30 hover:to-purple-600/40 border border-[#00F0FF]/40 text-[#00F0FF] rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Admit Next 50 Fans →
+                </button>
+              </div>
+            </div>
+
+            {queueActionMessage && (
+              <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl text-xs text-purple-200 flex items-center justify-between">
+                <span>{queueActionMessage}</span>
+                <button onClick={() => setQueueActionMessage(null)} className="text-slate-400 hover:text-white">✕</button>
+              </div>
+            )}
+
+            {/* Metrics HUD Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Waiting in Line
+                </span>
+                <p className="text-2xl font-black text-white font-mono mt-1">
+                  {queueStatus?.queueLength ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-500">Live queue FIFO depth</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Admitted to Checkout
+                </span>
+                <p className="text-2xl font-black text-[#A3F736] font-mono mt-1">
+                  {queueStatus?.admittedCount ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-500">Passed fair gate</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Active Hold Tokens
+                </span>
+                <p className="text-2xl font-black text-[#00F0FF] font-mono mt-1">
+                  {queueStatus?.activeTokens ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-500">10-min reservation window</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Batch Rate Setting
+                </span>
+                <p className="text-2xl font-black text-[#FF2E93] font-mono mt-1">
+                  {queueStatus?.maxBatchAdmitSize ?? 50} / {queueStatus?.batchAdmitIntervalSec ?? 5}s
+                </p>
+                <span className="text-[10px] text-slate-500">Dynamic admission pacing</span>
+              </div>
+            </div>
           </div>
 
           {/* Recent Orders & Promoters Grid */}
@@ -530,6 +769,114 @@ export default function EventCommandCenterPage() {
                   className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
                 >
                   {actionLoading ? 'Creating Tier...' : 'Create Ticket Tier'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Details Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <span>✏️</span> Edit Event Details
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                className="text-slate-400 hover:text-slate-200 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateEvent} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Event Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Experience details, performers, guidelines..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Start Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.startsAt}
+                    onChange={(e) => setEditForm({ ...editForm, startsAt: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">End Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.endsAt}
+                    onChange={(e) => setEditForm({ ...editForm, endsAt: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Timezone</label>
+                  <select
+                    value={editForm.timezone}
+                    onChange={(e) => setEditForm({ ...editForm, timezone: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">America/New_York</option>
+                    <option value="Europe/London">Europe/London</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Age Restriction</label>
+                  <input
+                    type="text"
+                    value={editForm.ageRestriction}
+                    onChange={(e) => setEditForm({ ...editForm, ageRestriction: e.target.value })}
+                    placeholder="e.g. 18+, 21+, All Ages"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

@@ -26,4 +26,13 @@ export class TicketsController {
   ) {
     return this.ticketsService.findTicketById(actor, id);
   }
+
+  @Get(':id/qr')
+  async getTicketQr(
+    @CurrentUser() actor: AuthContext,
+    @Param('id') id: string,
+  ) {
+    const ticket = await this.ticketsService.findTicketById(actor, id);
+    return { token: ticket.qrToken ?? '' };
+  }
 }

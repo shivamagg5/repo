@@ -74,8 +74,8 @@ export class NotificationsController {
     @Param('provider') provider: string,
     @Body() body: any,
   ) {
-    // Provider delivery webhook signature verification & status normalization
-    return { status: 'processed', provider, deduplicated: true };
+    const result = await this.outboxService.recordProviderWebhookDelivery(provider, body);
+    return { status: 'processed', provider, updatedCount: result.updatedCount, deduplicated: true };
   }
 
   @Post('outbox/process')

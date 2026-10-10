@@ -59,7 +59,9 @@ export type SettlementStatus =
   | 'processing'
   | 'paid'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'rejected'
+  | 'on_hold';
 
 export type CheckinResult =
   | 'success'

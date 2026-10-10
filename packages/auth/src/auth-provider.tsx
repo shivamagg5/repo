@@ -311,6 +311,10 @@ export function AuthProvider({
   const loginAsDemo = useCallback(
     async (role: DemoRole): Promise<{ success: boolean; error?: string }> => {
       setError(null);
+      if (process.env.NODE_ENV === 'production') {
+        setStatus('unauthenticated');
+        return { success: false, error: 'Demo logins are disabled in production.' };
+      }
       setStatus('loading');
 
       const persona = DEMO_PERSONAS[role];
@@ -344,6 +348,8 @@ export function AuthProvider({
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('eventplatform_demo_role', role);
+          document.cookie = `sb-access-token=${persona.token}; path=/; max-age=86400; SameSite=Lax`;
+          document.cookie = `eventplatform_demo_role=${role}; path=/; max-age=86400; SameSite=Lax`;
         } catch {
           // ignore
         }
@@ -363,6 +369,8 @@ export function AuthProvider({
       try {
         const storedRole = localStorage.getItem('eventplatform_demo_role') as DemoRole | null;
         if (storedRole && DEMO_PERSONAS[storedRole]) {
+          document.cookie = `sb-access-token=${DEMO_PERSONAS[storedRole].token}; path=/; max-age=86400; SameSite=Lax`;
+          document.cookie = `eventplatform_demo_role=${storedRole}; path=/; max-age=86400; SameSite=Lax`;
           loginAsDemo(storedRole);
           return;
         }
@@ -384,6 +392,9 @@ export function AuthProvider({
       setUser(initialSession?.user ?? null);
 
       if (initialSession) {
+        if (typeof window !== 'undefined') {
+          document.cookie = `sb-access-token=${initialSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        }
         hydrateProfile(initialSession).finally(() => {
           if (mounted) setStatus('authenticated');
         });
@@ -403,9 +414,16 @@ export function AuthProvider({
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (newSession) {
+          if (typeof window !== 'undefined') {
+            document.cookie = `sb-access-token=${newSession.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          }
           await hydrateProfile(newSession);
         }
       } else if (event === 'SIGNED_OUT') {
+        if (typeof window !== 'undefined') {
+          document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax';
+          document.cookie = 'eventplatform_demo_role=; path=/; max-age=0; SameSite=Lax';
+        }
         setProfile(null);
         setOrganizations([]);
         setActiveOrg(null);
@@ -455,6 +473,9 @@ export function AuthProvider({
         return { success: false, error: userMsg };
       }
       if (result.session) {
+        if (typeof window !== 'undefined') {
+          document.cookie = `sb-access-token=${result.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        }
         setSession(result.session);
         setUser(result.session.user);
         await hydrateProfile(result.session);
@@ -488,6 +509,9 @@ export function AuthProvider({
         return { success: false, error: userMsg };
       }
       if (result.session) {
+        if (typeof window !== 'undefined') {
+          document.cookie = `sb-access-token=${result.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        }
         setSession(result.session);
         setUser(result.session.user);
         await hydrateProfile(result.session);
@@ -518,11 +542,9 @@ export function AuthProvider({
   const logout = useCallback(async (): Promise<void> => {
     try {
       if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem('eventplatform_demo_role');
-        } catch {
-          // ignore
-        }
+        localStorage.removeItem('eventplatform_demo_role');
+        document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'eventplatform_demo_role=; path=/; max-age=0; SameSite=Lax';
       }
       if (session?.access_token && !session.access_token.startsWith('dev-token-')) {
         try {
@@ -530,8 +552,10 @@ export function AuthProvider({
         } catch {
           // ignore
         }
-        await supabaseSignOut(supabase);
       }
+      await supabaseSignOut(supabase);
+    } catch {
+      // ignore
     } finally {
       setSession(null);
       setUser(null);
@@ -541,7 +565,7 @@ export function AuthProvider({
       setStatus('unauthenticated');
       setError(null);
     }
-  }, [supabase, session?.access_token, apiClient]);
+  }, [supabase, session, apiClient]);
 
   const reauthenticate = useCallback(
     async (password: string): Promise<{ success: boolean; error?: string }> => {

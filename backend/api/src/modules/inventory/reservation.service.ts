@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
@@ -18,6 +19,7 @@ import {
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { HoldStateMachineService } from './hold-state-machine.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import type {
   AuthContext,
   CreateReservationInput,
@@ -33,6 +35,7 @@ export class ReservationService {
     private readonly idempotency: IdempotencyService,
     private readonly holdStateMachine: HoldStateMachineService,
     private readonly audit: AuditService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   /**

@@ -248,4 +248,76 @@ describe('ScannerService — Hardened Device Operations & Tamper Testing Suite',
     expect(res.result).toBe('wrong_event');
     expect(res.message).toContain('different event');
   });
+
+  describe('Scanner Heartbeat & Gate Terminal Telemetry', () => {
+    it('Records hardware heartbeat and telemetry from a turnstile scanner terminal', async () => {
+      mockDb.query.checkinDevices.findFirst.mockResolvedValue({
+        id: 'dev-terminal-01',
+        deviceIdentifier: 'GATE-01-TERMINAL',
+        status: 'active',
+        lastSeenAt: new Date(Date.now() - 60000),
+      });
+
+      const heartbeat = await scannerService.recordHeartbeat({
+        deviceId: 'dev-terminal-01',
+        eventId: 'evt-summer-2026',
+        gateId: 'gate-01',
+        batteryLevel: 88,
+        isCharging: false,
+        offlineQueueDepth: 3,
+        networkLatencyMs: 35,
+        appVersion: '2.4.0',
+      });
+
+      expect(heartbeat.deviceId).toBe('dev-terminal-01');
+      expect(heartbeat.deviceIdentifier).toBe('GATE-01-TERMINAL');
+      expect(heartbeat.batteryLevel).toBe(88);
+      expect(heartbeat.isCharging).toBe(false);
+      expect(heartbeat.offlineQueueDepth).toBe(3);
+      expect(heartbeat.networkLatencyMs).toBe(35);
+      expect(heartbeat.appVersion).toBe('2.4.0');
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it('Fails heartbeat with NotFoundException when device is not found', async () => {
+      mockDb.query.checkinDevices.findFirst.mockResolvedValue(null);
+
+      await expect(
+        scannerService.recordHeartbeat({
+          deviceId: 'dev-ghost-99',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('Retrieves active scanner terminals for a specific event', async () => {
+      mockDb.query.events.findFirst.mockResolvedValue({
+        id: 'evt-summer-2026',
+        title: 'Summer Music Fest',
+      });
+
+      mockDb.query.checkinDevices.findFirst.mockResolvedValue({
+        id: 'dev-terminal-02',
+        deviceIdentifier: 'GATE-02-TERMINAL',
+        status: 'active',
+        lastSeenAt: new Date(),
+      });
+
+      // Record a heartbeat for the event
+      await scannerService.recordHeartbeat({
+        deviceId: 'dev-terminal-02',
+        eventId: 'evt-summer-2026',
+        gateId: 'gate-02',
+        batteryLevel: 94,
+        isCharging: true,
+      });
+
+      const devices = await scannerService.getEventDevices('evt-summer-2026');
+      expect(devices).toHaveLength(1);
+      expect(devices[0]!.deviceId).toBe('dev-terminal-02');
+      expect(devices[0]!.eventId).toBe('evt-summer-2026');
+      expect(devices[0]!.batteryLevel).toBe(94);
+      expect(devices[0]!.isCharging).toBe(true);
+    });
+  });
 });
+

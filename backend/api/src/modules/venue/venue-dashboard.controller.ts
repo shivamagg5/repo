@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Post,
+  Param,
   Body,
   UseGuards,
 } from '@nestjs/common';
@@ -58,5 +59,36 @@ export class VenueDashboardController {
     const validated = inviteMemberSchema.parse(body);
     const orgId = await this.dashboardService.getUserVenueOrgId(actor.userId);
     return this.membersService.invite(actor.userId, orgId, validated as any);
+  }
+
+  @Get('tables')
+  getTables(@CurrentUser() actor: AuthContext) {
+    return this.dashboardService.getTables(actor);
+  }
+
+  @Patch('tables/:id')
+  updateTable(
+    @CurrentUser() actor: AuthContext,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.dashboardService.updateTable(actor, id, body);
+  }
+
+  @Post('tables/:id/orders')
+  addBottleOrder(
+    @CurrentUser() actor: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { bottleName: string; price?: number },
+  ) {
+    return this.dashboardService.addBottleOrder(actor, id, body.bottleName, body.price ?? 0);
+  }
+
+  @Post('tables/:id/reset')
+  resetTable(
+    @CurrentUser() actor: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.dashboardService.resetTable(actor, id);
   }
 }

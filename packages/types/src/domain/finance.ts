@@ -53,6 +53,12 @@ export interface SettlementDto {
   approvedBy: string | null;
   approvedAt: string | null;
   rejectionReason: string | null;
+  paymentProfileId?: string | null;
+  maskedAccountNumber?: string | null;
+  ifsc?: string | null;
+  transactionReference?: string | null;
+  paidAt?: string | null;
+  disbursedBy?: string | null;
   createdAt: string;
 }
 
@@ -65,8 +71,13 @@ export interface GenerateSettlementInput {
 }
 
 export interface ReviewSettlementInput {
-  action: 'approve' | 'reject';
+  action: 'approve' | 'reject' | 'hold';
   reason?: string;
+}
+
+export interface DisburseSettlementInput {
+  transactionReference: string;
+  idempotencyKey: string;
 }
 
 export interface ReconciliationExceptionDto {

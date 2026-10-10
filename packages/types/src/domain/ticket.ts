@@ -1,5 +1,14 @@
 import type { TicketStatus } from './enums.js';
 
+export type PartyEntryType = 'general' | 'couple' | 'female' | 'stag' | 'vip_table' | 'guestlist';
+
+export interface TablePackageDetails {
+  tableNumber?: string;
+  minSpendMinor?: number;
+  coverChargeIncludedMinor?: number;
+  maxGuests?: number;
+}
+
 export interface TicketType {
   id: string;
   eventId: string;
@@ -15,6 +24,9 @@ export interface TicketType {
   saleStartsAt: string | null;
   saleEndsAt: string | null;
   status: string;
+  entryType?: PartyEntryType;
+  curfewTime?: string | null;
+  tableDetails?: TablePackageDetails | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +43,9 @@ export interface CreateTicketTypeInput {
   saleStartsAt?: string | null;
   saleEndsAt?: string | null;
   status?: string;
+  entryType?: PartyEntryType;
+  curfewTime?: string | null;
+  tableDetails?: TablePackageDetails | null;
 }
 
 export interface UpdateTicketTypeInput {
@@ -88,6 +103,11 @@ export interface Ticket {
   issuedAt: string;
   checkedInAt: string | null;
   voidedAt: string | null;
+  ticketTypeName?: string;
+  tierName?: string;
+  eventTitle?: string;
+  venueName?: string;
+  eventStartsAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,3 +212,40 @@ export interface AttendeeSearchResultDto {
   status: string;
   checkedInAt: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// GUESTLIST DOMAIN DTOs
+// ---------------------------------------------------------------------------
+
+export interface GuestlistEntryDto {
+  id: string;
+  eventId: string;
+  promoterId?: string | null;
+  promoterName?: string | null;
+  guestName: string;
+  guestPhone: string | null;
+  guestEmail: string | null;
+  entryType: PartyEntryType;
+  allowedCount: number;
+  admittedCount: number;
+  curfewTime: string | null;
+  tableNumber: string | null;
+  status: 'active' | 'admitted' | 'expired' | 'cancelled';
+  qrToken?: string;
+  notes?: string | null;
+  createdAt: string;
+  checkedInAt?: string | null;
+}
+
+export interface CreateGuestlistInput {
+  eventId: string;
+  guestName: string;
+  guestPhone?: string | null;
+  guestEmail?: string | null;
+  entryType?: PartyEntryType;
+  allowedCount?: number;
+  curfewTime?: string | null;
+  tableNumber?: string | null;
+  notes?: string | null;
+}
+

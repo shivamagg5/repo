@@ -9,11 +9,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { PromoterLayout } from '../../../components/PromoterLayout';
 import { apiClient, ApiError } from '../../../lib/api';
+import { ShareCampaignModal } from '../../../components/ShareCampaignModal';
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = (params?.id as string) ?? '';
   const [copied, setCopied] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const consumerOrigin = process.env.NEXT_PUBLIC_CONSUMER_URL ?? 'http://localhost:3000';
 
   const [campaign, setCampaign] = useState<any | null>(null);
@@ -134,9 +136,15 @@ export default function CampaignDetailPage() {
                 </span>
                 <button
                   onClick={handleCopy}
-                  className="px-4 py-2 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-bold shadow-md hover:brightness-110"
+                  className="px-3.5 py-2 rounded-lg bg-slate-800 text-slate-200 text-xs font-semibold hover:bg-slate-700 transition-colors"
                 >
                   {copied ? '✓ Copied Link' : 'Copy Link'}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <span>⚡</span> Share Kit & QR Code
                 </button>
               </div>
               <p className="text-[11px] text-slate-500">
@@ -144,6 +152,14 @@ export default function CampaignDetailPage() {
               </p>
             </div>
           </div>
+        )}
+
+        {/* Marketing Kit & QR Code Modal */}
+        {showShareModal && campaign && (
+          <ShareCampaignModal
+            campaign={campaign}
+            onClose={() => setShowShareModal(false)}
+          />
         )}
       </div>
     </PromoterLayout>

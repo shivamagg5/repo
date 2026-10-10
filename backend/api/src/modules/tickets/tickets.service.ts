@@ -4,11 +4,18 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
-import { tickets } from '../../database/schema/index';
+import { tickets, ticketTypes, events, venues } from '../../database/schema/index';
 import { ScannerCryptoService } from '../scanner/scanner-crypto.service';
 import type { AuthContext, Ticket } from '@platform/types';
+
+interface TicketMetadata {
+  ticketTypeName?: string;
+  eventTitle?: string;
+  venueName?: string;
+  eventStartsAt?: Date | null;
+}
 
 @Injectable()
 export class TicketsService {
@@ -20,35 +27,99 @@ export class TicketsService {
   ) {}
 
   /**
-   * Find all tickets belonging to authenticated consumer.
+   * Find all tickets belonging to authenticated consumer with rich event and tier metadata.
    */
   async findUserTickets(actor: AuthContext): Promise<Ticket[]> {
     const list = await this.db.db
-      .select()
+      .select({
+        ticket: tickets,
+        ticketTypeName: ticketTypes.name,
+        eventTitle: events.title,
+        eventStartsAt: events.startsAt,
+        venueName: venues.name,
+      })
       .from(tickets)
+      .leftJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+      .leftJoin(events, eq(tickets.eventId, events.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
       .where(eq(tickets.userId, actor.userId))
       .execute();
 
-    return list.map((t) => this.mapTicket(t));
+    return list.map((item) =>
+      this.mapTicket(item.ticket, {
+        ticketTypeName: item.ticketTypeName ?? undefined,
+        eventTitle: item.eventTitle ?? undefined,
+        venueName: item.venueName ?? undefined,
+        eventStartsAt: item.eventStartsAt ?? undefined,
+      }),
+    );
   }
 
   /**
-   * Find ticket by ID for owner.
+   * Find ticket by ID for owner with full event, venue, and tier details.
    */
   async findTicketById(actor: AuthContext, ticketId: string): Promise<Ticket> {
-    const tkt = await this.db.db.query.tickets.findFirst({
-      where: eq(tickets.id, ticketId),
-    });
+    const [row] = await this.db.db
+      .select({
+        ticket: tickets,
+        ticketTypeName: ticketTypes.name,
+        eventTitle: events.title,
+        eventStartsAt: events.startsAt,
+        venueName: venues.name,
+      })
+      .from(tickets)
+      .leftJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+      .leftJoin(events, eq(tickets.eventId, events.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .where(eq(tickets.id, ticketId))
+      .limit(1)
+      .execute();
 
-    if (!tkt) throw new NotFoundException({ code: 'TICKET_NOT_FOUND', message: 'Ticket not found.' });
-    if (tkt.userId !== actor.userId) {
+    if (!row || !row.ticket) {
+      throw new NotFoundException({ code: 'TICKET_NOT_FOUND', message: 'Ticket not found.' });
+    }
+    if (row.ticket.userId !== actor.userId) {
       throw new ForbiddenException({ code: 'TICKET_ACCESS_DENIED', message: 'Cannot access another user ticket.' });
     }
 
-    return this.mapTicket(tkt);
+    return this.mapTicket(row.ticket, {
+      ticketTypeName: row.ticketTypeName ?? undefined,
+      eventTitle: row.eventTitle ?? undefined,
+      venueName: row.venueName ?? undefined,
+      eventStartsAt: row.eventStartsAt ?? undefined,
+    });
   }
 
-  private mapTicket(raw: typeof tickets.$inferSelect): Ticket {
+  /**
+   * Find tickets belonging to a specific order for the authenticated owner.
+   */
+  async findTicketsByOrderId(actor: AuthContext, orderId: string): Promise<Ticket[]> {
+    const list = await this.db.db
+      .select({
+        ticket: tickets,
+        ticketTypeName: ticketTypes.name,
+        eventTitle: events.title,
+        eventStartsAt: events.startsAt,
+        venueName: venues.name,
+      })
+      .from(tickets)
+      .leftJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+      .leftJoin(events, eq(tickets.eventId, events.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .where(and(eq(tickets.orderId, orderId), eq(tickets.userId, actor.userId)))
+      .execute();
+
+    return list.map((item) =>
+      this.mapTicket(item.ticket, {
+        ticketTypeName: item.ticketTypeName ?? undefined,
+        eventTitle: item.eventTitle ?? undefined,
+        venueName: item.venueName ?? undefined,
+        eventStartsAt: item.eventStartsAt ?? undefined,
+      }),
+    );
+  }
+
+  private mapTicket(raw: typeof tickets.$inferSelect, meta?: TicketMetadata): Ticket {
     let qrToken: string | undefined;
 
     if (raw.status === 'issued' || raw.status === 'checked_in') {
@@ -81,6 +152,11 @@ export class TicketsService {
       issuedAt: raw.issuedAt.toISOString(),
       checkedInAt: raw.checkedInAt ? raw.checkedInAt.toISOString() : null,
       voidedAt: raw.voidedAt ? raw.voidedAt.toISOString() : null,
+      ticketTypeName: meta?.ticketTypeName,
+      tierName: meta?.ticketTypeName,
+      eventTitle: meta?.eventTitle,
+      venueName: meta?.venueName,
+      eventStartsAt: meta?.eventStartsAt ? meta.eventStartsAt.toISOString() : undefined,
     };
   }
 }

@@ -4,9 +4,9 @@
 // =============================================================================
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { useAuth, useAnalytics } from '@platform/auth';
 import { Navbar } from '../../../components/Navbar';
@@ -14,13 +14,9 @@ import { Footer } from '../../../components/Footer';
 import { TicketCard, Button, Card } from '@platform/ui';
 import type { Ticket } from '@platform/types';
 
-export default function TicketDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const ticketId = resolvedParams.id;
+export default function TicketDetailPage() {
+  const params = useParams<{ id: string }>();
+  const ticketId = params?.id || '';
 
   const router = useRouter();
   const { isAuthenticated, status, apiClient, user } = useAuth();
@@ -137,11 +133,11 @@ export default function TicketDetailPage({
             <TicketCard
               id={ticket.id}
               ticketNumber={ticket.ticketNumber}
-              eventTitle="Standard Event Experience"
-              tierName="General Admission"
-              startsAt={ticket.issuedAt}
-              venueName="Main Arena Gates"
-              seatInfo="Gate A / General Floor"
+              eventTitle={ticket.eventTitle || "Live Event Pass"}
+              tierName={ticket.ticketTypeName || ticket.tierName || "General Admission"}
+              startsAt={ticket.eventStartsAt || ticket.issuedAt}
+              venueName={ticket.venueName || "Main Arena Gates"}
+              seatInfo="Entry Gate / General Floor"
               status={getMappedStatus()}
               showLiveClock={true}
               qrCodeElement={

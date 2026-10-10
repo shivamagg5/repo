@@ -13,8 +13,12 @@ export class SettlementStateMachineService {
 
     switch (transitionKey) {
       case 'draft -> pending_review':
+      case 'draft -> cancelled':
       case 'pending_review -> approved':
+      case 'pending_review -> rejected':
+      case 'pending_review -> on_hold':
       case 'pending_review -> failed':
+      case 'on_hold -> pending_review':
       case 'approved -> processing':
       case 'processing -> paid':
       case 'processing -> failed':

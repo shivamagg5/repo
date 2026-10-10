@@ -37,6 +37,7 @@ export interface EventListItemDto {
   venueSlug: string | null;
   categoryName: string | null;
   categorySlug: string | null;
+  minPriceMinor?: number;
 }
 
 /**

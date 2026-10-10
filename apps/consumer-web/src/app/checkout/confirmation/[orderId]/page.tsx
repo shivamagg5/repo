@@ -4,22 +4,18 @@
 // =============================================================================
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 import { Navbar } from '../../../../components/Navbar';
 import { Footer } from '../../../../components/Footer';
 import { Card, Badge, Button, Spinner } from '@platform/ui';
 import type { Order, OrderItem } from '@platform/types';
 
-export default function OrderConfirmationPage({
-  params,
-}: {
-  params: Promise<{ orderId: string }>;
-}) {
-  const resolvedParams = use(params);
-  const orderId = resolvedParams.orderId;
+export default function OrderConfirmationPage() {
+  const params = useParams<{ orderId: string }>();
+  const orderId = params?.orderId || '';
   const searchParams = useSearchParams();
 
   const router = useRouter();
@@ -95,6 +91,24 @@ export default function OrderConfirmationPage({
       <Navbar />
 
       <main className="container mx-auto px-4 py-12 max-w-2xl flex-1">
+        {/* --- 3-STEP CHECKOUT STEPPER --- */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/events" className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5 font-medium">
+              ← Explore More Events
+            </Link>
+            <Badge variant="success" size="sm">
+              Step 3 of 3: Order Completed
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="h-1.5 rounded-full bg-purple-600"></div>
+            <div className="h-1.5 rounded-full bg-purple-600"></div>
+            <div className="h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+          </div>
+        </div>
+
         {loading ? (
           <Card variant="default" padding="lg" className="text-center">
             <Spinner size={36} className="mx-auto mb-4" />

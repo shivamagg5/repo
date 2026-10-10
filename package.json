@@ -16,6 +16,8 @@
     "test": "pnpm -r test",
     "test:unit": "pnpm -r test:unit",
     "test:integration": "pnpm -r test:integration",
+    "test:load": "pnpm --filter @platform/api test:load",
+    "verify:env": "pnpm --filter @platform/api verify:env",
     "clean": "pnpm -r clean && rimraf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .gitignore"

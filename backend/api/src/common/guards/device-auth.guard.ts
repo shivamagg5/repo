@@ -21,8 +21,13 @@ export class DeviceAuthGuard implements CanActivate {
     const timestamp = request.headers['x-device-timestamp'] as string;
     const signature = request.headers['x-device-signature'] as string;
 
-    // Device registration does not require pre-existing headers
-    if (request.path.endsWith('/scanner/register')) {
+    // Device registration, onboarding, heartbeat, and portal device telemetry monitoring do not require pre-existing device signature headers
+    if (
+      request.path.endsWith('/scanner/register') ||
+      request.path.endsWith('/scanner/onboard') ||
+      request.path.endsWith('/scanner/heartbeat') ||
+      request.path.includes('/devices')
+    ) {
       return true;
     }
 

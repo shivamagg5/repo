@@ -4,9 +4,9 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service';
-import { users } from '../../database/schema/index';
+import { users, userFavorites, events, venues } from '../../database/schema/index';
 import { AuditService } from '../../common/audit/audit.service';
 import type { UserProfile } from '@platform/types';
 import type { UpdateProfileInput } from './dto/update-profile.dto';
@@ -181,4 +181,76 @@ export class UsersService {
       createdAt: user.createdAt.toISOString(),
     };
   }
+
+  /**
+   * Get user's favorited events
+   */
+  async getFavorites(userId: string) {
+    const rows = await this.db.db
+      .select({
+        id: events.id,
+        title: events.title,
+        slug: events.slug,
+        description: events.description,
+        status: events.status,
+        startsAt: events.startsAt,
+        endsAt: events.endsAt,
+        timezone: events.timezone,
+        venueName: venues.name,
+        venueCity: venues.city,
+        favoritedAt: userFavorites.createdAt,
+      })
+      .from(userFavorites)
+      .innerJoin(events, eq(userFavorites.eventId, events.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .where(eq(userFavorites.userId, userId))
+      .orderBy(sql`${userFavorites.createdAt} desc`)
+      .execute();
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      slug: r.slug,
+      description: r.description,
+      status: r.status,
+      startsAt: r.startsAt.toISOString(),
+      endsAt: r.endsAt.toISOString(),
+      timezone: r.timezone,
+      venue: r.venueName ? { name: r.venueName, city: r.venueCity } : null,
+      favoritedAt: r.favoritedAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Add event to user's favorites
+   */
+  async addFavorite(userId: string, eventId: string) {
+    const event = await this.db.db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (!event) {
+      throw new NotFoundException({ code: 'EVENT_NOT_FOUND', message: 'Event not found' });
+    }
+
+    await this.db.db
+      .insert(userFavorites)
+      .values({ userId, eventId })
+      .onConflictDoNothing()
+      .execute();
+
+    return { success: true, message: 'Event added to favorites' };
+  }
+
+  /**
+   * Remove event from user's favorites
+   */
+  async removeFavorite(userId: string, eventId: string) {
+    await this.db.db
+      .delete(userFavorites)
+      .where(and(eq(userFavorites.userId, userId), eq(userFavorites.eventId, eventId)))
+      .execute();
+
+    return { success: true, message: 'Event removed from favorites' };
+  }
 }
+

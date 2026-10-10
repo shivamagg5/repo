@@ -12,6 +12,21 @@ export interface PromoterCampaign {
   commissionType: string;
   commissionValue: number;
   status: string;
+  eventTitle?: string;
+  eventSlug?: string;
+  startsAt?: string;
+  venueName?: string | null;
+}
+
+export interface PromoterEligibleEventDto {
+  id: string;
+  title: string;
+  slug: string;
+  startsAt: string;
+  endsAt: string;
+  venueName: string | null;
+  city: string | null;
+  organizerName: string;
 }
 
 export interface CreatePromoterCampaignInput {
@@ -70,3 +85,29 @@ export interface PromoterEarningsSummaryDto {
   reversedCommissionMinor: number;
   currency: string;
 }
+
+export interface PromoterPayoutRequestInput {
+  amountMinor: number;
+  payoutMethod: 'upi' | 'bank_transfer';
+  upiId?: string;
+  bankAccount?: {
+    accountNumber: string;
+    ifscCode: string;
+    accountHolderName: string;
+  };
+  notes?: string;
+}
+
+export interface PromoterPayoutDto {
+  id: string;
+  promoterId: string;
+  amountMinor: number;
+  currency: string;
+  payoutMethod: 'upi' | 'bank_transfer';
+  destinationDetail: string;
+  status: 'pending' | 'processing' | 'completed' | 'rejected';
+  requestedAt: string;
+  processedAt: string | null;
+  transactionReference: string | null;
+}
+

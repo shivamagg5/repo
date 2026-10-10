@@ -1,122 +1,91 @@
-# Walkthrough: Complete Event Booking & Operations Platform Ecosystem
+# End-to-End Wiring: Organizer & Admin Portals Walkthrough
 
-All security vulnerabilities, financial invariants, multi-tenant database controls, web portals, and mobile applications across the entire repository are implemented, tested, and verified against real staging infrastructure.
+## Summary of Completed Work
 
----
-
-## 1. Subsystem Verification Ledger
-
-```text
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│                                PLATFORM PRODUCTION AUDIT                                 │
-├─────────────────────────────────────────┬─────────────────────────┬──────────────────────┤
-│ System / Layer                          │ Verification Mechanism  │ Status               │
-├─────────────────────────────────────────┼─────────────────────────┼──────────────────────┤
-│ Central Backend API                     │ 43 Suites / 198 Tests   │ 🟢 100% PASS         │
-│ Core Packages (@platform/types/val/cfg) │ TypeScript Build        │ 🟢 100% PASS         │
-│ 5-Portal Dashboard Verification         │ verify-all-dashboards.ts│ 🟢 100% PASS         │
-│ Consumer Web Portal (apps/consumer-web) │ 17 Next.js 15 Routes    │ 🟢 100% PASS         │
-│ Organizer Portal (apps/organizer-web)   │ 12 Next.js 15 Routes    │ 🟢 100% PASS         │
-│ Superadmin Console (apps/admin-web)     │ 13 Next.js 15 Routes    │ 🟢 100% PASS         │
-│ Venue Portal (apps/venue-web)           │ 10 Next.js 15 Routes    │ 🟢 100% PASS         │
-│ Promoter Portal (apps/promoter-web)     │ 10 Next.js 15 Routes    │ 🟢 100% PASS         │
-│ Consumer Mobile (apps/consumer-mobile)  │ Flutter Test (14/14)    │ 🟢 0 Issues / PASS   │
-│ Gate Scanner Mobile (apps/scanner-mobile│ Flutter Test (24/24)    │ 🟢 0 Issues / PASS   │
-│ Live Razorpay Sandbox Integration       │ HMAC SHA-256 / Capture  │ 🟢 100% VERIFIED     │
-│ PostgreSQL 17.6 Schema & RLS            │ 57 Tables / Isolation   │ 🟢 100% VERIFIED     │
-│ Double-Entry General Ledger Engine      │ Balanced Journals (Σ=0) │ 🟢 100% VERIFIED     │
-│ Concurrency & Anti-Oversell Engine      │ Row Locks / 50 Holds    │ 🟢 100% VERIFIED     │
-└─────────────────────────────────────────┴─────────────────────────┴──────────────────────┘
-```
+All Organizer and Admin portal pages have been wired end-to-end against the NestJS backend, PostgreSQL 17 database, RLS security policies, RBAC authorization, and NIST P-256 ECDSA cryptographic ticket verification.
 
 ---
 
-## 2. Core Architecture & Feature Highlights
+## Key Deliverables Completed Across All 6 Phases
 
-### A. Central Backend API & Database
-- **PostgreSQL 17.6 Schema**: 57 tables, 57 primary keys, 77 foreign keys, 34 unique constraints, 91 performance indexes, and 11 enums.
-- **Multi-Tenant Isolation**: Row-Level Security (RLS) enabled across all tables with 17 adversarial tenant penetration checks.
-- **Double-Entry General Ledger**: Immutable journal lines with strict debit/credit balancing ($\sum \text{Dr} == \sum \text{Cr}$) for every payment capture, platform fee deduction, and refund.
-- **Outbox Pattern Notifications**: Event-driven notification dispatch via `notification_outbox` with exponential retry backoff, simulated provider outage resilience, and user preference enforcement.
+### 1. Organizer `/marketing` Portal
+- **Marketing Overview & Stats**: Direct aggregation of active campaigns, total orders attributed, and gross sales conversions.
+- **Promotional Campaigns Engine**: Creation of discount campaigns with unique code collision protection and type-checked percentage/fixed discounts in minor units.
+- **Credit Wallet System**: Top-up flow enforcing integer math with mandatory 18% GST calculation (base paise + GST paise = total transaction paise).
+- **Frontend Live Connection**: [apps/organizer-web/src/app/marketing/page.tsx](file:///c:/Users/HP/Desktop/event%20booking%20app/apps/organizer-web/src/app/marketing/page.tsx) wired to backend via `@platform/api-client`.
 
-### B. Mobile Applications (Flutter)
-- **`apps/consumer-mobile`**:
-  - Event discovery carousel, search with debounced filtering, 10-minute hold reservation countdown timers.
-  - Razorpay payment intent creation and native ticket wallet with offline-cached ticket records.
-  - `flutter analyze`: **0 issues** | `flutter test`: **14/14 passing**.
-- **`apps/scanner-mobile`**:
-  - Offline cryptographic ticket verification using **PointyCastle NIST P-256 / SHA-256 ECDSA** and ASN.1 DER signature decoding.
-  - 3-Way organization binding (`staffOrg == deviceOrg == eventOrg`) with device key pair generation and `X-Device-Signature` signed request headers.
-  - Offline queue sync reconciliation (`synced_success` vs `synced_conflict`).
-  - `flutter analyze`: **0 issues** | `flutter test`: **24/24 passing**.
+### 2. Organizer `/data` Audience Intelligence
+- **Audience & Attendee Directory**: Tenant-scoped attendee query with sorting (spend, orders, date), search filters, and aggregate lifetime spend.
+- **Promoter Performance Attribution**: Real-time sales conversion tracking, ticket quantities sold, and affiliate attribution.
+- **Gate-Level Scan Analytics**: Total scanned tickets vs pending check-ins with check-in percentage rates.
+- **CSV Data Stream Export**: UTF-8 sanitized, SQL-injection safe attendee CSV download.
+- **Frontend Live Connection**: [apps/organizer-web/src/app/data/page.tsx](file:///c:/Users/HP/Desktop/event%20booking%20app/apps/organizer-web/src/app/data/page.tsx) wired to backend via `@platform/api-client`.
 
-### C. 5 Web Applications (Next.js 15)
-- **`apps/consumer-web` (Port 3000)**: Discovery homepage, event detail with dynamic seat selection, live hold countdown timer, Razorpay modal checkout, and digital ticket wallet.
-- **`apps/organizer-web` (Port 3002)**: Event wizard with ticket tier config, real-time command center, team pairing passkey cards, and settlement statements with gross sales/net payout receipts.
-- **`apps/admin-web` (Port 3005)**: Event moderation approval queue, user suspension/restoration controls, immutable audit log feed, and platform GMV metrics.
-- **`apps/venue-web` (Port 3003)**: Venue space management, booking calendar slots, and gate security staff roster.
-- **`apps/promoter-web` (Port 3004)**: Custom referral link generator, click tracking with abuse prevention, attributed orders, and commission earnings breakdown.
+### 3. Organizer `/payout` Financial Governance
+- **Masked Payment Profile Storage**: Storage and retrieval of bank accounts with automatic mask formatting (`••••••••1098`) protecting raw account credentials.
+- **GST Undertaking Declaration**: Legal declaration checkbox and audit timestamp recording.
+- **Ledger Settlement History**: Double-entry ledger settlement statements with gross sales, platform commission deductions, GST breakdown, and net payout amounts.
+- **Frontend Live Connection**: [apps/organizer-web/src/app/payout/page.tsx](file:///c:/Users/HP/Desktop/event%20booking%20app/apps/organizer-web/src/app/payout/page.tsx) wired to backend via `@platform/api-client`.
+
+### 4. Superadmin `/customers` 360° Operations
+- **Universal Customer Directory**: Fast global lookup with automated lifetime value calculation (LTV minor units) and VIP Spender segmentation.
+- **360° Profile Modal**: Unified view of attendee's order history, registered tickets, and security audit log trail.
+- **Internal Admin Notes**: Live agent note persistence with full audit logging (`action: 'customer.notes_updated'`).
+- **Cryptographic P-256 ECDSA Ticket Reissuance**: Reissues QR tokens using canonical `TICKET.v1|<ticketId>|<eventId>|<ticketTypeId>|<issuedAt>|<expiresAt>|<keyVersion>|<sig>` format verifiable offline by mobile scanners.
+- **Administrative Ticket Transfer**: Safe ownership transfer between user accounts with audit trail.
+- **Frontend Live Connection**: [apps/admin-web/src/app/customers/page.tsx](file:///c:/Users/HP/Desktop/event%20booking%20app/apps/admin-web/src/app/customers/page.tsx) wired to backend via `@platform/api-client`.
+
+### 5. Superadmin `/support` Dispute Governance
+- **Support Ticket Triage**: Real-time listing, status progression (`open` -> `in_progress` -> `resolved`), and resolution notes.
+- **Authoritative Refund Review Queue**: Double-entry ledger refund execution calling `AdminService.refundOrder` ensuring balanced ledger debit/credits and payment provider integration.
+- **Payment Dispute & Chargeback Logs**: Inspection of dispute risk scores and status monitoring.
+- **Frontend Live Connection**: [apps/admin-web/src/app/support/page.tsx](file:///c:/Users/HP/Desktop/event%20booking%20app/apps/admin-web/src/app/support/page.tsx) wired to backend via `@platform/api-client`.
 
 ---
 
-## 3. Automated Test Evidence
+## Verification Results
 
-### Backend API Test Suite
-```text
-Test Suites: 43 passed, 43 total
-Tests:       198 passed, 198 total
+### 1. Backend Integration Test Suite
+```bash
+PASS src/modules/organizer/organizer-marketing-data.spec.ts
+PASS src/modules/admin/admin-customers-support.spec.ts
+PASS src/modules/scanner/scanner-crypto.spec.ts
+... (all 45 test suites)
+
+Test Suites: 45 passed, 45 total
+Tests:       207 passed, 207 total
 Snapshots:   0 total
-Time:        20.042 s
+Time:        35.688 s
 ```
 
-### 5-Portal Dashboard Verification
-```text
-[Suite 1: Organizer Dashboard Controller (/organizer/*)]
-  --> [GET /organizer/overview]: {"grossTicketSalesMinor":54500000,"totalTicketsSold":11700,"netOrganizerMinor":54287500}
-  --> [GET /settlements/organizer/:id/statement]: Gross ₹545,000 | Platform Fee ₹16,350 | Net ₹528,650
-  --> ✅ Suite 1 (Organizer Portal): PASS
+### 2. Flutter Mobile Test Suites
+- **Scanner Mobile**:
+  ```bash
+  flutter test in apps/scanner-mobile
+  00:05 +24: All tests passed! (24/24 passed - 100%)
+  ```
+- **Consumer Mobile**:
+  ```bash
+  flutter test in apps/consumer-mobile
+  00:04 +14: All tests passed! (14/14 passed - 100%)
+  ```
 
-[Suite 2: Superadmin Platform Console (/admin/*)]
-  --> [GET /admin/events/review-queue]: Returned 1 events pending moderation
-  --> [GET /analytics/admin]: Total Platform GMV ₹12,500,000 | Tickets: 42,500 | Active Events: 18
-  --> ✅ Suite 2 (Superadmin Console): PASS
-
-[Suite 3: Venue Operations Portal (/venue/*)]
-  --> [GET /venue/profile]: Grand Arena Bangalore (Address: Whitefield Main Rd)
-  --> [GET /venue/calendar]: 1 scheduled calendar event days
-  --> ✅ Suite 3 (Venue Portal): PASS
-
-[Suite 4: Promoter Growth Portal (/promoter/*)]
-  --> [GET /promoter/campaigns]: 1 campaigns (Code: EARLYVIP20, Orders: 85, GMV: ₹42,500)
-  --> [GET /promoter/earnings]: Earned ₹2,125 | Pending ₹625
-  --> ✅ Suite 4 (Promoter Portal): PASS
-
-[Suite 5: Events Management (/events)]
-  --> [GET /events?organizationId=...]: 2 events returned
-  --> ✅ Suite 5 (Events Management): PASS
+### 3. Full Monorepo Build
+```bash
+pnpm build
+Scope: 13 of 14 workspace projects
+packages/config: Done
+packages/design-tokens: Done
+packages/types: Done
+packages/api-client: Done
+packages/validation: Done
+packages/ui: Done
+packages/auth: Done
+backend/api: Done
+apps/admin-web: Done
+apps/organizer-web: Done
+apps/consumer-web: Done
+apps/venue-web: Done
+apps/promoter-web: Done
 ```
-
-### Live Razorpay Sandbox Verification (Gate C & E)
-```text
-[Scenario 1: Live Razorpay Order Creation via Gateway]
-  --> PASS: Live Razorpay order generated: order_TSTlldYSqZYg2q (Amount: 150000 INR)
-[Scenario 2: Raw-Body HMAC SHA-256 Signature Verification]
-  --> PASS: Valid HMAC signature accepted (true) & Tampered signature rejected (false)
-[Scenario 3: Webhook Duplicate Replay Invariant]
-  --> PASS: Duplicate provider_event_id produces 0 duplicate records.
-```
-
----
-
-## 4. How to Run Any Portal Locally
-
-| Service | Command | Port |
-| :--- | :--- | :---: |
-| **Central Backend API** | `pnpm --filter @platform/api dev` | `3001` |
-| **Consumer Website** | `pnpm --filter consumer-web dev` | `3000` |
-| **Organizer Portal** | `pnpm --filter organizer-web dev` | `3002` |
-| **Venue Portal** | `pnpm --filter venue-web dev` | `3003` |
-| **Promoter Portal** | `pnpm --filter promoter-web dev` | `3004` |
-| **Superadmin Console** | `pnpm --filter admin-web dev` | `3005` |
-| **Consumer Mobile** | `cd apps/consumer-mobile && flutter run` | Mobile |
-| **Scanner Mobile** | `cd apps/scanner-mobile && flutter run` | Mobile |
+All packages and 5 Next.js applications compiled with **0 TypeScript and 0 build errors**.

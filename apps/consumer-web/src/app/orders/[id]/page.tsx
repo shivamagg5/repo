@@ -4,22 +4,18 @@
 // =============================================================================
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 import { Navbar } from '../../../components/Navbar';
 import { Footer } from '../../../components/Footer';
 import { Card, Badge, Button } from '@platform/ui';
 import type { Order, OrderItem } from '@platform/types';
 
-export default function OrderDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const orderId = resolvedParams.id;
+export default function OrderDetailPage() {
+  const params = useParams<{ id: string }>();
+  const orderId = params?.id || '';
 
   const router = useRouter();
   const { isAuthenticated, status, apiClient } = useAuth();

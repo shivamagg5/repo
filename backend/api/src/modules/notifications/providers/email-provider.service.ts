@@ -12,16 +12,26 @@ export class EmailProviderService implements INotificationProvider {
     const resendApiKey = process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY;
     const sendgridApiKey = process.env.SENDGRID_API_KEY;
     const isProduction = process.env.NODE_ENV === 'production';
-    const fromAddress = process.env.EMAIL_FROM_ADDRESS || (isProduction ? null : 'onboarding@resend.dev');
+    const fromAddress =
+      process.env.EMAIL_FROM_ADDRESS ||
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.SENDGRID_FROM_EMAIL ||
+      process.env.NOTIFICATION_FROM_EMAIL ||
+      (isProduction ? 'notifications@pulsr.live' : 'onboarding@resend.dev');
 
-    if (!fromAddress) {
-      this.logger.error('[EmailProvider] Production sender email missing (EMAIL_FROM_ADDRESS must be set to a verified domain)');
-      return {
-        status: 'permanent_failure',
-        providerMessageId: null,
-        failureReason: 'EMAIL_PROVIDER_UNCONFIGURED: Missing verified EMAIL_FROM_ADDRESS for production sending domain',
-      };
-    }
+    const cleanText = input.body
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<br\s*[\/]?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .trim();
 
     // 1. Resend API Integration
     if (resendApiKey) {
@@ -38,7 +48,7 @@ export class EmailProviderService implements INotificationProvider {
             to: [input.recipient],
             subject: input.subject,
             html: input.body,
-            text: input.body.replace(/<[^>]*>?/gm, ''),
+            text: cleanText,
           }),
         });
 

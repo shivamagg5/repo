@@ -54,6 +54,33 @@ export interface FunnelAnalysisReportDto {
   steps: FunnelStepDto[];
 }
 
+export interface TopSellingTierDto {
+  ticketTypeId: string;
+  name: string;
+  ticketsSold: number;
+  grossRevenueMinor: number;
+}
+
+export interface RealtimeInventoryUpdateDto {
+  eventId: string;
+  ticketTypeId: string;
+  remainingCapacity: number;
+  heldCapacity: number;
+  totalCapacity: number;
+  timestamp: string;
+}
+
+export interface RealtimeScanEventDto {
+  eventId: string;
+  ticketId: string;
+  ticketNumber: string;
+  tierName: string;
+  attendeeName?: string;
+  gate?: string;
+  scannedAt: string;
+  status: 'admitted' | 'duplicate';
+}
+
 export interface OrganizerAnalyticsDto {
   organizationId: string;
   eventId: string | null;
@@ -87,3 +114,49 @@ export interface AdminPlatformMetricsDto {
   activeOrganizersCount: number;
   activeEventsCount: number;
 }
+
+export interface TurnstileTelemetryDto {
+  eventId: string;
+  totalAdmitted: number;
+  totalCapacity: number;
+  admittedPercentage: number;
+  ingressVelocityPerMin: number;
+  activeGatesCount: number;
+  gateBreakdown: Array<{
+    gate: string;
+    admittedCount: number;
+    lastScanAt: string | null;
+  }>;
+  tierBreakdown: Array<{
+    tierName: string;
+    admittedCount: number;
+  }>;
+  recentAlertsCount: number;
+  timestamp: string;
+}
+
+export interface ScannerDeviceHeartbeatDto {
+  deviceId: string;
+  deviceIdentifier: string;
+  eventId?: string;
+  gateId?: string;
+  batteryLevel?: number; // 0-100
+  isCharging?: boolean;
+  offlineQueueDepth?: number;
+  networkLatencyMs?: number;
+  appVersion?: string;
+  lastSeenAt: string;
+}
+
+export interface ScannerHeartbeatInput {
+  deviceId: string;
+  deviceIdentifier?: string;
+  eventId?: string;
+  gateId?: string;
+  batteryLevel?: number;
+  isCharging?: boolean;
+  offlineQueueDepth?: number;
+  networkLatencyMs?: number;
+  appVersion?: string;
+}
+

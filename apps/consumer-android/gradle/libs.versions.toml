@@ -1,0 +1,119 @@
+# Verify all versions at https://maven.google.com/web/index.html before first build.
+# Run: ./gradlew :app:dependencies to check resolved versions.
+
+[versions]
+agp                     = "8.8.0"
+kotlin                  = "2.1.0"
+ksp                     = "2.1.0-1.0.29"
+compose-bom             = "2025.04.01"
+compose-navigation      = "2.8.5"
+circuit                 = "0.25.0"
+ktor                    = "3.1.0"
+coil                    = "3.1.0"
+hilt                    = "2.53.1"
+hilt-navigation         = "1.2.0"
+supabase                = "3.1.0"
+datastore               = "1.1.2"
+core-ktx                = "1.15.0"
+activity-compose        = "1.10.0"
+lifecycle               = "2.8.7"
+razorpay                = "1.6.40"
+firebase-bom            = "33.7.0"
+workmanager             = "2.10.0"
+startup                 = "1.2.0"
+zxing                   = "4.3.0"
+
+[plugins]
+android-application     = { id = "com.android.application",              version.ref = "agp"    }
+kotlin-android          = { id = "org.jetbrains.kotlin.android",          version.ref = "kotlin" }
+kotlin-compose          = { id = "org.jetbrains.kotlin.plugin.compose",   version.ref = "kotlin" }
+kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+hilt                    = { id = "com.google.dagger.hilt.android",        version.ref = "hilt"  }
+ksp                     = { id = "com.google.devtools.ksp",               version.ref = "ksp"   }
+
+[libraries]
+# Core Android
+core-ktx                = { group = "androidx.core",               name = "core-ktx",                     version.ref = "core-ktx"         }
+activity-compose        = { group = "androidx.activity",            name = "activity-compose",              version.ref = "activity-compose" }
+startup-runtime         = { group = "androidx.startup",             name = "startup-runtime",               version.ref = "startup"          }
+
+# Lifecycle
+lifecycle-viewmodel     = { group = "androidx.lifecycle",           name = "lifecycle-viewmodel-ktx",       version.ref = "lifecycle"        }
+lifecycle-compose       = { group = "androidx.lifecycle",           name = "lifecycle-runtime-compose",     version.ref = "lifecycle"        }
+
+# Compose BOM (pins all compose versions together)
+compose-bom             = { group = "androidx.compose",             name = "compose-bom",                  version.ref = "compose-bom"      }
+compose-ui              = { group = "androidx.compose.ui",          name = "ui"                                                            }
+compose-ui-graphics     = { group = "androidx.compose.ui",          name = "ui-graphics"                                                   }
+compose-ui-tooling      = { group = "androidx.compose.ui",          name = "ui-tooling"                                                    }
+compose-ui-tooling-preview = { group = "androidx.compose.ui",       name = "ui-tooling-preview"                                            }
+compose-material3       = { group = "androidx.compose.material3",   name = "material3"                                                     }
+compose-material-icons  = { group = "androidx.compose.material",    name = "material-icons-extended"                                       }
+compose-animation       = { group = "androidx.compose.animation",   name = "animation"                                                     }
+compose-foundation      = { group = "androidx.compose.foundation",  name = "foundation"                                                    }
+
+# Navigation
+compose-navigation      = { group = "androidx.navigation",          name = "navigation-compose",            version.ref = "compose-navigation" }
+
+# Circuit (Slack MVI)
+circuit-foundation      = { group = "com.slack.circuit",            name = "circuit-foundation",            version.ref = "circuit"          }
+circuit-runtime         = { group = "com.slack.circuit",            name = "circuit-runtime",               version.ref = "circuit"          }
+circuit-overlay         = { group = "com.slack.circuit",            name = "circuit-overlay",               version.ref = "circuit"          }
+circuit-retained        = { group = "com.slack.circuit",            name = "circuit-retained",              version.ref = "circuit"          }
+circuit-test            = { group = "com.slack.circuit",            name = "circuit-test",                  version.ref = "circuit"          }
+
+# Ktor (Network)
+ktor-client-core        = { group = "io.ktor",                      name = "ktor-client-core",              version.ref = "ktor"             }
+ktor-client-okhttp      = { group = "io.ktor",                      name = "ktor-client-okhttp",            version.ref = "ktor"             }
+ktor-client-negotiation = { group = "io.ktor",                      name = "ktor-client-content-negotiation", version.ref = "ktor"          }
+ktor-serialization-json = { group = "io.ktor",                      name = "ktor-serialization-kotlinx-json", version.ref = "ktor"          }
+ktor-client-auth        = { group = "io.ktor",                      name = "ktor-client-auth",              version.ref = "ktor"             }
+ktor-client-logging     = { group = "io.ktor",                      name = "ktor-client-logging",           version.ref = "ktor"             }
+ktor-client-mock        = { group = "io.ktor",                      name = "ktor-client-mock",              version.ref = "ktor"             }
+
+# Coil 3 (Image Loading)
+coil-compose            = { group = "io.coil-kt.coil3",             name = "coil-compose",                  version.ref = "coil"             }
+coil-network-okhttp     = { group = "io.coil-kt.coil3",             name = "coil-network-okhttp",           version.ref = "coil"             }
+
+# Hilt (DI)
+hilt-android            = { group = "com.google.dagger",            name = "hilt-android",                  version.ref = "hilt"             }
+hilt-compiler           = { group = "com.google.dagger",            name = "hilt-compiler",                 version.ref = "hilt"             }
+hilt-navigation         = { group = "androidx.hilt",                name = "hilt-navigation-compose",       version.ref = "hilt-navigation"  }
+
+# Supabase (Auth)
+supabase-auth           = { group = "io.github.jan-tennert.supabase", name = "auth-kt",                    version.ref = "supabase"         }
+supabase-postgrest      = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt",               version.ref = "supabase"         }
+
+# DataStore (Encrypted local prefs)
+datastore-preferences   = { group = "androidx.datastore",           name = "datastore-preferences",         version.ref = "datastore"        }
+
+# Firebase
+firebase-bom            = { group = "com.google.firebase",          name = "firebase-bom",                  version.ref = "firebase-bom"     }
+firebase-messaging      = { group = "com.google.firebase",          name = "firebase-messaging-ktx"                                        }
+
+# Razorpay (Payment)
+razorpay                = { group = "com.razorpay",                 name = "checkout",                      version.ref = "razorpay"         }
+
+# ZXing (QR Generation — no Play Services needed)
+zxing                   = { group = "com.journeyapps",              name = "zxing-android-embedded",        version.ref = "zxing"            }
+zxing-core              = { group = "com.google.zxing",             name = "core",                          version = "3.5.3"                }
+
+# WorkManager (background tasks)
+workmanager-ktx         = { group = "androidx.work",                name = "work-runtime-ktx",              version.ref = "workmanager"      }
+hilt-work               = { group = "androidx.hilt",                name = "hilt-work",                     version = "1.2.0"                }
+hilt-work-compiler      = { group = "androidx.hilt",                name = "hilt-compiler",                 version = "1.2.0"                }
+
+# Testing
+junit5                  = { group = "org.junit.jupiter",            name = "junit-jupiter",                 version = "5.11.3"               }
+mockk                   = { group = "io.mockk",                     name = "mockk",                         version = "1.13.14"              }
+turbine                 = { group = "app.cash.turbine",             name = "turbine",                       version = "1.2.0"                }
+compose-ui-test         = { group = "androidx.compose.ui",          name = "ui-test-junit4"                                                }
+compose-ui-test-manifest = { group = "androidx.compose.ui",         name = "ui-test-manifest"                                              }
+
+[bundles]
+compose                 = ["compose-ui", "compose-ui-graphics", "compose-material3", "compose-material-icons", "compose-animation", "compose-foundation", "compose-navigation", "compose-ui-tooling-preview"]
+circuit                 = ["circuit-foundation", "circuit-runtime", "circuit-overlay", "circuit-retained"]
+ktor                    = ["ktor-client-core", "ktor-client-okhttp", "ktor-client-negotiation", "ktor-serialization-json", "ktor-client-auth", "ktor-client-logging"]
+coil                    = ["coil-compose", "coil-network-okhttp"]
+supabase                = ["supabase-auth", "supabase-postgrest"]
+lifecycle               = ["lifecycle-viewmodel", "lifecycle-compose"]

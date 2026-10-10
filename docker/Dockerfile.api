@@ -1,0 +1,55 @@
+# =============================================================================
+# Multi-stage Dockerfile for Central NestJS API
+# Production hardened: Node 22 Alpine, Non-root user, dumb-init, zero devDeps
+# =============================================================================
+
+# --- Stage 1: Base ---
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+WORKDIR /app
+
+# --- Stage 2: Dependencies & Build ---
+FROM base AS builder
+WORKDIR /app
+
+# Copy root configurations & workspace manifests
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY packages ./packages
+COPY backend ./backend
+
+# Install dependencies and compile workspace
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm --filter @platform/types build
+RUN pnpm --filter @platform/config build
+RUN pnpm --filter @platform/validation build
+RUN pnpm --filter @platform/api build
+
+# Prune devDependencies for production runtime
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm --filter @platform/api --prod deploy /app/pruned
+
+# --- Stage 3: Production Runner ---
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+RUN apk add --no-cache dumb-init
+
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Run as unprivileged node user
+USER node
+
+# Copy built application and pruned production node_modules
+COPY --chown=node:node --from=builder /app/pruned/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/backend/api/dist ./dist
+COPY --chown=node:node --from=builder /app/backend/api/package.json ./package.json
+
+EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/main.js"]

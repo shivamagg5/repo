@@ -21,6 +21,8 @@ import {
   scanTicketSchema,
   batchSyncScansSchema,
   attendeeSearchQuerySchema,
+  scannerOnboardSchema,
+  scannerHeartbeatSchema,
 } from '@platform/validation';
 import type { Request } from 'express';
 
@@ -31,7 +33,7 @@ import type { Request } from 'express';
  * is a fatal auth error, not a default value.
  */
 function requireUserId(req: Request): string {
-  const userId = (req as any).user?.sub ?? (req as any).user?.id;
+  const userId = (req as any).user?.userId ?? (req as any).user?.sub ?? (req as any).user?.id;
   if (!userId) {
     throw new ForbiddenException({
       code: 'MISSING_USER_IDENTITY',
@@ -41,21 +43,20 @@ function requireUserId(req: Request): string {
   return userId;
 }
 
-function requireOrganizationId(req: Request): string {
-  const orgId = (req as any).user?.organizationId;
-  if (!orgId) {
-    throw new ForbiddenException({
-      code: 'MISSING_ORGANIZATION_CONTEXT',
-      message: 'Authenticated user does not have an organization context. Scanner access requires org membership.',
-    });
-  }
-  return orgId;
-}
-
 @Controller('scanner')
 @UseGuards(AuthGuard, DeviceAuthGuard)
 export class ScannerController {
   constructor(private readonly scannerService: ScannerService) {}
+
+  @Post('onboard')
+  @HttpCode(HttpStatus.OK)
+  async onboardDevice(
+    @Body(new ZodValidationPipe(scannerOnboardSchema)) body: any,
+    @Req() req: Request,
+  ) {
+    const staffUserId = requireUserId(req);
+    return this.scannerService.onboardScanner(body, staffUserId);
+  }
 
   @Post('register')
   @HttpCode(HttpStatus.OK)
@@ -63,8 +64,12 @@ export class ScannerController {
     @Body(new ZodValidationPipe(deviceRegisterSchema)) body: any,
     @Req() req: Request,
   ) {
-    // FIX-005: orgId must come from verified JWT — no zero-UUID fallback
-    const orgId = requireOrganizationId(req);
+    const staffUserId = requireUserId(req);
+    const requestedOrgId =
+      (req.query?.['organizationId'] as string) ||
+      (body as any)?.organizationId ||
+      (req.headers['x-organization-id'] as string);
+    const orgId = await this.scannerService.resolveStaffOrgId(staffUserId, requestedOrgId);
     return this.scannerService.registerDevice(body, orgId);
   }
 
@@ -74,9 +79,12 @@ export class ScannerController {
     @Body(new ZodValidationPipe(devicePairSchema)) body: any,
     @Req() req: Request,
   ) {
-    // FIX-005/006: Both userId and orgId required; service enforces org/device binding
     const staffUserId = requireUserId(req);
-    const staffOrgId = requireOrganizationId(req);
+    const requestedOrgId =
+      (req.query?.['organizationId'] as string) ||
+      (body as any)?.organizationId ||
+      (req.headers['x-organization-id'] as string);
+    const staffOrgId = await this.scannerService.resolveStaffOrgForEvent(staffUserId, body.eventId, requestedOrgId);
     return this.scannerService.pairDevice(body, staffUserId, staffOrgId);
   }
 
@@ -88,7 +96,10 @@ export class ScannerController {
     @Req() req: Request,
   ) {
     const staffUserId = requireUserId(req);
-    const staffOrgId = requireOrganizationId(req);
+    const requestedOrgId =
+      (req.query?.['organizationId'] as string) ||
+      (req.headers['x-organization-id'] as string);
+    const staffOrgId = await this.scannerService.resolveStaffOrgForEvent(staffUserId, eventId, requestedOrgId);
     return this.scannerService.pairDevice({ deviceId, eventId, gateId }, staffUserId, staffOrgId);
   }
 
@@ -136,4 +147,18 @@ export class ScannerController {
       staffUserId,
     );
   }
+
+  @Post('heartbeat')
+  @HttpCode(HttpStatus.OK)
+  async recordHeartbeat(
+    @Body(new ZodValidationPipe(scannerHeartbeatSchema)) body: any,
+  ) {
+    return this.scannerService.recordHeartbeat(body);
+  }
+
+  @Get('events/:id/devices')
+  async getEventDevices(@Param('id') eventId: string) {
+    return this.scannerService.getEventDevices(eventId);
+  }
 }
+

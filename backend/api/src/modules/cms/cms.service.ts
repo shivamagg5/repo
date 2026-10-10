@@ -14,7 +14,7 @@ import {
   cmsEditorialBlocks,
   events,
 } from '../../database/schema/index';
-import { eq, and, inArray, gte, lte, or, isNull, asc } from 'drizzle-orm';
+import { eq, and, inArray, gte, lte, or, isNull, asc, desc } from 'drizzle-orm';
 import type {
   CmsBannerDto,
   CreateCmsBannerInput,
@@ -22,6 +22,7 @@ import type {
   CmsCollectionDto,
   CreateCmsCollectionInput,
   CmsEditorialBlockDto,
+  CreateCmsEditorialBlockInput,
 } from '@platform/types';
 
 export const PUBLIC_ELIGIBLE_EVENT_STATUSES = ['approved', 'published', 'live', 'completed'];
@@ -241,5 +242,238 @@ export class CmsService {
       status: b.status as any,
       createdAt: b.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * ADMIN GET ALL BANNERS (ALL STATUSES: draft, scheduled, published, archived)
+   */
+  async getAllBannersAdmin(): Promise<CmsBannerDto[]> {
+    const db = this.databaseService.db;
+    const rows = await db.query.cmsBanners.findMany({
+      orderBy: [asc(cmsBanners.displayOrder)],
+    });
+
+    return rows.map((b) => ({
+      id: b.id,
+      title: b.title,
+      imageUrl: b.imageUrl,
+      targetUrl: b.targetUrl,
+      displayOrder: b.displayOrder,
+      status: b.status as any,
+      startAt: b.startAt ? b.startAt.toISOString() : null,
+      endAt: b.endAt ? b.endAt.toISOString() : null,
+      createdAt: b.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * UPDATE CMS BANNER (ADMIN)
+   */
+  async updateBanner(id: string, input: Partial<CreateCmsBannerInput>, actorUserId: string): Promise<CmsBannerDto> {
+    const db = this.databaseService.db;
+    const existing = await db.query.cmsBanners.findFirst({
+      where: eq(cmsBanners.id, id),
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`CMS banner ${id} not found.`);
+    }
+
+    const updates: any = {};
+    if (input.title !== undefined) updates.title = this.sanitizeMarkdown(input.title);
+    if (input.imageUrl !== undefined) updates.imageUrl = input.imageUrl;
+    if (input.targetUrl !== undefined) updates.targetUrl = input.targetUrl;
+    if (input.displayOrder !== undefined) updates.displayOrder = input.displayOrder;
+    if (input.status !== undefined) updates.status = input.status;
+    if (input.startAt !== undefined) updates.startAt = input.startAt ? new Date(input.startAt) : null;
+    if (input.endAt !== undefined) updates.endAt = input.endAt ? new Date(input.endAt) : null;
+
+    const [updated] = await db
+      .update(cmsBanners)
+      .set(updates)
+      .where(eq(cmsBanners.id, id))
+      .returning();
+
+    this.auditService.log({
+      actorUserId,
+      action: 'cms.banner_updated',
+      category: 'admin',
+      entityType: 'cms_banner',
+      entityId: id,
+      metadata: updates,
+    });
+
+    return {
+      id: updated!.id,
+      title: updated!.title,
+      imageUrl: updated!.imageUrl,
+      targetUrl: updated!.targetUrl,
+      displayOrder: updated!.displayOrder,
+      status: updated!.status as any,
+      startAt: updated!.startAt ? updated!.startAt.toISOString() : null,
+      endAt: updated!.endAt ? updated!.endAt.toISOString() : null,
+      createdAt: updated!.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * DELETE CMS BANNER (ADMIN)
+   */
+  async deleteBanner(id: string, actorUserId: string): Promise<{ success: boolean; id: string }> {
+    const db = this.databaseService.db;
+    const existing = await db.query.cmsBanners.findFirst({
+      where: eq(cmsBanners.id, id),
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`CMS banner ${id} not found.`);
+    }
+
+    await db.delete(cmsBanners).where(eq(cmsBanners.id, id));
+
+    this.auditService.log({
+      actorUserId,
+      action: 'cms.banner_deleted',
+      category: 'admin',
+      entityType: 'cms_banner',
+      entityId: id,
+      metadata: { title: existing.title },
+    });
+
+    return { success: true, id };
+  }
+
+  /**
+   * GET COLLECTIONS (ADMIN & PUBLIC)
+   */
+  async getCollections(): Promise<CmsCollectionDto[]> {
+    const db = this.databaseService.db;
+    const rows = await db.query.cmsCollections.findMany({
+      orderBy: [desc(cmsCollections.createdAt)],
+    });
+
+    return rows.map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      slug: c.slug,
+      description: c.description,
+      coverImageUrl: c.coverImageUrl,
+      status: c.status as any,
+      publishedAt: c.publishedAt ? c.publishedAt.toISOString() : null,
+      createdAt: c.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * CREATE EDITORIAL BLOCK (ADMIN)
+   */
+  async createEditorialBlock(input: CreateCmsEditorialBlockInput, actorUserId: string): Promise<CmsEditorialBlockDto> {
+    const db = this.databaseService.db;
+    const sanitizedHeadline = this.sanitizeMarkdown(input.headline);
+    const sanitizedBody = this.sanitizeMarkdown(input.bodyMarkdown);
+
+    const [block] = await db
+      .insert(cmsEditorialBlocks)
+      .values({
+        blockType: input.blockType,
+        headline: sanitizedHeadline,
+        bodyMarkdown: sanitizedBody,
+        mediaUrl: input.mediaUrl ?? null,
+        displayOrder: input.displayOrder ?? 0,
+        status: input.status ?? 'draft',
+      })
+      .returning();
+
+    this.auditService.log({
+      actorUserId,
+      action: 'cms.editorial_block_created',
+      category: 'admin',
+      entityType: 'cms_editorial_block',
+      entityId: block!.id,
+      metadata: { blockType: input.blockType, headline: sanitizedHeadline },
+    });
+
+    return {
+      id: block!.id,
+      blockType: block!.blockType,
+      headline: block!.headline,
+      bodyMarkdown: block!.bodyMarkdown,
+      mediaUrl: block!.mediaUrl,
+      displayOrder: block!.displayOrder,
+      status: block!.status as any,
+      createdAt: block!.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * ADD FEATURED EVENT PIN (ADMIN)
+   */
+  async addFeaturedEvent(eventId: string, displayOrder = 0, badgeText?: string, actorUserId = 'admin'): Promise<CmsFeaturedEventDto> {
+    const db = this.databaseService.db;
+    const ev = await db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+
+    if (!ev) {
+      throw new NotFoundException(`Event ${eventId} not found.`);
+    }
+
+    if (!PUBLIC_ELIGIBLE_EVENT_STATUSES.includes(ev.status)) {
+      throw new BadRequestException(`Event ${ev.title} is in status ${ev.status} and cannot be featured.`);
+    }
+
+    const [featured] = await db
+      .insert(cmsFeaturedEvents)
+      .values({
+        eventId,
+        displayOrder,
+        badgeText: badgeText ?? null,
+        status: 'published',
+      })
+      .onConflictDoUpdate({
+        target: cmsFeaturedEvents.eventId,
+        set: {
+          displayOrder,
+          badgeText: badgeText ?? null,
+          status: 'published',
+        },
+      })
+      .returning();
+
+    this.auditService.log({
+      actorUserId,
+      action: 'cms.featured_event_pinned',
+      category: 'admin',
+      entityType: 'cms_featured_event',
+      entityId: featured!.id,
+      metadata: { eventId, displayOrder, badgeText },
+    });
+
+    return {
+      id: featured!.id,
+      eventId: featured!.eventId,
+      displayOrder: featured!.displayOrder,
+      badgeText: featured!.badgeText,
+      status: featured!.status as any,
+      createdAt: featured!.createdAt ? new Date(featured!.createdAt).toISOString() : new Date().toISOString(),
+    };
+  }
+
+  /**
+   * REMOVE FEATURED EVENT PIN (ADMIN)
+   */
+  async removeFeaturedEvent(id: string, actorUserId: string): Promise<{ success: boolean; id: string }> {
+    const db = this.databaseService.db;
+    await db.delete(cmsFeaturedEvents).where(eq(cmsFeaturedEvents.id, id));
+
+    this.auditService.log({
+      actorUserId,
+      action: 'cms.featured_event_unpinned',
+      category: 'admin',
+      entityType: 'cms_featured_event',
+      entityId: id,
+    });
+
+    return { success: true, id };
   }
 }

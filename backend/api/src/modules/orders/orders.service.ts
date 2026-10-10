@@ -218,6 +218,25 @@ export class OrdersService {
     };
   }
 
+  /**
+   * Resolve existing order for an active inventory reservation hold.
+   */
+  async getOrCreateOrderForReservation(actor: AuthContext, reservationId: string): Promise<{ order: Order; items: OrderItem[] }> {
+    const hold = await this.db.db.query.inventoryReservations.findFirst({
+      where: eq(inventoryReservations.id, reservationId),
+    });
+
+    if (!hold) {
+      throw new NotFoundException({ code: 'RESERVATION_NOT_FOUND', message: 'Reservation not found.' });
+    }
+
+    if (hold.userId && hold.userId !== actor.userId) {
+      throw new ForbiddenException({ code: 'RESERVATION_ACCESS_DENIED', message: 'Cannot access reservation of another user.' });
+    }
+
+    return this.findOrderById(actor, hold.orderId);
+  }
+
   private mapOrder(raw: typeof orders.$inferSelect): Order {
     return {
       id: raw.id,

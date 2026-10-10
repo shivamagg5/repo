@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { apiClient, ApiError } from '../../lib/api';
 import { Badge, Button, Card, Skeleton } from '@platform/ui';
+import { FraudRiskBadge, computeOrderRisk } from '../../components/FraudRiskBadge';
 
 interface AdminOrderSummary {
   id: string;
@@ -44,6 +45,9 @@ export default function AdminOrdersPage() {
   const [refundError, setRefundError] = useState<string | null>(null);
   const [refundSuccess, setRefundSuccess] = useState<string | null>(null);
 
+  // Fraud Threat Actions State
+  const [orderSecurityActions, setOrderSecurityActions] = useState<Record<string, 'fraud_frozen' | 'whitelisted'>>({});
+
   const fetchOrders = useCallback(async () => {
     setLoadingList(true);
     setListError(null);
@@ -53,7 +57,10 @@ export default function AdminOrdersPage() {
       if (searchQuery.trim()) params['search'] = searchQuery.trim();
 
       const res = await apiClient.listAdminOrders<any>(params);
-      const list = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+      let list: AdminOrderSummary[] = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+      if (selectedStatus === 'high_risk') {
+        list = list.filter((ord) => computeOrderRisk(ord).level === 'high');
+      }
       setOrdersList(list);
     } catch (err: any) {
       if (err instanceof ApiError) {
@@ -193,17 +200,26 @@ export default function AdminOrdersPage() {
         {/* Filter Status Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0C101A] p-3 rounded-2xl border border-slate-800">
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {['all', 'paid', 'pending', 'refunded', 'cancelled'].map((tab) => (
+            {[
+              { id: 'all', label: 'All Orders' },
+              { id: 'paid', label: 'Paid' },
+              { id: 'pending', label: 'Pending' },
+              { id: 'refunded', label: 'Refunded' },
+              { id: 'cancelled', label: 'Cancelled' },
+              { id: 'high_risk', label: '⚠️ High Risk Alerts' },
+            ].map((tab) => (
               <button
-                key={tab}
-                onClick={() => setSelectedStatus(tab)}
+                key={tab.id}
+                onClick={() => setSelectedStatus(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
-                  selectedStatus === tab
-                    ? 'bg-red-600 text-white shadow-sm'
+                  selectedStatus === tab.id
+                    ? tab.id === 'high_risk'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-red-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                 }`}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -242,6 +258,7 @@ export default function AdminOrdersPage() {
                     <th className="py-3 px-4">Event</th>
                     <th className="py-3 px-4">Amount</th>
                     <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Fraud Threat</th>
                     <th className="py-3 px-4">Created At</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -264,6 +281,9 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         {getStatusBadge(ord.status)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <FraudRiskBadge order={ord} />
                       </td>
                       <td className="py-3.5 px-4 text-[11px] text-slate-400 font-mono">
                         {new Date(ord.createdAt).toLocaleDateString('en-IN', {
@@ -319,6 +339,86 @@ export default function AdminOrdersPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Automated Fraud & Threat Assessment Radar */}
+              {(() => {
+                const threat = computeOrderRisk(selectedOrder);
+                const actionState = orderSecurityActions[selectedOrder.id];
+
+                return (
+                  <div
+                    className="p-4 rounded-xl border space-y-3"
+                    style={{
+                      background: threat.level === 'high' ? 'rgba(255, 45, 120, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                      borderColor: threat.level === 'high' ? 'rgba(255, 45, 120, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                    }}
+                  >
+                    <div className="flex flex-wrap justify-between items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🛡️</span>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                          Automated Fraud & Scalper Threat Assessment
+                        </h4>
+                      </div>
+                      <FraudRiskBadge order={selectedOrder} />
+                    </div>
+
+                    <div className="text-xs text-slate-300">
+                      <strong>Verdict:</strong> {threat.verdict}
+                    </div>
+
+                    {/* Threat Signals Breakdown */}
+                    <div className="space-y-1 bg-black/30 p-2.5 rounded-lg border border-white/5 text-[11px] font-mono">
+                      {threat.signals.map((sig, i) => (
+                        <div key={i} className="flex items-center gap-2 text-slate-300">
+                          <span className={threat.level === 'high' ? 'text-rose-400' : 'text-emerald-400'}>
+                            {threat.level === 'high' ? '!' : '✓'}
+                          </span>
+                          <span>{sig}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Threat Admin Actions */}
+                    <div className="flex flex-wrap justify-between items-center pt-1 text-xs">
+                      {actionState === 'fraud_frozen' ? (
+                        <span className="px-2.5 py-1 rounded-lg bg-red-600/30 text-red-300 border border-red-500/40 font-bold font-mono text-[11px]">
+                          ⚠️ Pass Frozen & Gate Admission Suspended
+                        </span>
+                      ) : actionState === 'whitelisted' ? (
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-bold font-mono text-[11px]">
+                          ✓ Marked as Whitelisted Buyer
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Zero turnstile incidents recorded
+                        </span>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOrderSecurityActions((prev) => ({ ...prev, [selectedOrder.id]: 'whitelisted' }))
+                          }
+                          className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-semibold text-[11px] transition-colors"
+                        >
+                          Whitelist Buyer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOrderSecurityActions((prev) => ({ ...prev, [selectedOrder.id]: 'fraud_frozen' }))
+                          }
+                          className="px-3 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 font-bold text-[11px] transition-colors"
+                        >
+                          Freeze Pass at Gates
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Purchaser & Event Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

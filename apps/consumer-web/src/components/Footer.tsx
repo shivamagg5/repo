@@ -64,17 +64,22 @@ export function Footer() {
           {/* Company */}
           <div>
             <h4 style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '14px' }}>
-              Company
+              Platform
             </h4>
-            {['About', 'Blog', 'Careers', 'Press', 'Contact'].map(item => (
+            {[
+              { label: 'About PULSR', href: '/about' },
+              { label: 'All Categories', href: '/categories' },
+              { label: 'Partner Venues', href: '/venues' },
+              { label: 'Support & Help', href: '/contact' },
+            ].map(item => (
               <Link
-                key={item}
-                href={`/${item.toLowerCase()}`}
+                key={item.href}
+                href={item.href}
                 style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '8px', textDecoration: 'none', transition: 'color 150ms' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
               >
-                {item}
+                {item.label}
               </Link>
             ))}
           </div>
@@ -87,18 +92,22 @@ export function Footer() {
           alignItems: 'center', justifyContent: 'space-between',
         }}>
           <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
-            © 2026 EventPlatform. All rights reserved.
+            © 2026 PULSR Live Technologies. All rights reserved.
           </p>
           <div style={{ display: 'flex', gap: '20px' }}>
-            {['Privacy Policy', 'Terms of Service', 'Cookie Policy'].map(item => (
+            {[
+              { label: 'Privacy Policy', href: '/privacy' },
+              { label: 'Terms of Service', href: '/terms' },
+              { label: 'Contact Us', href: '/contact' },
+            ].map(item => (
               <Link
-                key={item}
-                href="/"
+                key={item.href}
+                href={item.href}
                 style={{ fontSize: '12px', color: 'var(--text-3)', textDecoration: 'none', transition: 'color 150ms' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
               >
-                {item}
+                {item.label}
               </Link>
             ))}
           </div>
