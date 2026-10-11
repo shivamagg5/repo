@@ -190,7 +190,7 @@ private fun CheckoutContent(state: CheckoutState) {
                         )
                         Column {
                             Text(
-                                text = if (state.isQueueAdmitted) "⚡ Fair Queue Verified • Hold Token Active" else "⚡ Anti-Bot Fair Queue Active",
+                                text = if (state.isQueueAdmitted) "Fair Queue Verified • Hold Active" else "Anti-Bot Fair Queue Active",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (state.isQueueAdmitted) PulsrAcid else PulsrPink,
                                 fontWeight = FontWeight.Black

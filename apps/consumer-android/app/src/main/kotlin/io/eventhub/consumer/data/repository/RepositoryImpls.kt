@@ -2,9 +2,7 @@ package io.eventhub.consumer.data.repository
 
 import io.eventhub.consumer.data.mapper.toDomain
 import io.eventhub.consumer.data.remote.*
-import io.eventhub.consumer.data.remote.dto.CheckoutItemDto
-import io.eventhub.consumer.data.remote.dto.CheckoutSessionRequestDto
-import io.eventhub.consumer.data.remote.dto.UpdateUserRequestDto
+import io.eventhub.consumer.data.remote.dto.*
 import io.eventhub.consumer.domain.model.*
 import io.eventhub.consumer.domain.repository.*
 import io.github.jan.supabase.auth.Auth
@@ -473,8 +471,22 @@ class UserRepositoryImpl @Inject constructor(
 
     override suspend fun getMe(): User = api.getMe().toDomain()
 
-    override suspend fun updateMe(name: String?, phone: String?, avatarUrl: String?): User =
-        api.updateMe(UpdateUserRequestDto(name, phone, avatarUrl)).toDomain()
+    override suspend fun updateMe(
+        name: String?,
+        phone: String?,
+        avatarUrl: String?,
+        dob: String?,
+        whatsappConsent: Boolean?,
+    ): User =
+        api.updateMe(
+            UpdateUserRequestDto(
+                name = name,
+                phone = phone,
+                dob = dob,
+                whatsappConsent = whatsappConsent,
+                avatarUrl = avatarUrl,
+            )
+        ).toDomain()
 
     override suspend fun registerDeviceToken(fcmToken: String) =
         api.registerDeviceToken(fcmToken)
@@ -499,16 +511,52 @@ class UserRepositoryImpl @Inject constructor(
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val auth: Auth,
-    private val userApi: UserApiService
+    private val authApi: AuthApiService,
+    private val userApi: UserApiService,
+    private val tokenProvider: AuthTokenProvider,
 ) : AuthRepository {
 
-    override suspend fun signInWithEmail(email: String, password: String): User {
-        auth.signInWith(Email) {
-            this.email = email
-            this.password = password
-        }
-        return userApi.getMe().toDomain()
+    override suspend fun sendOtp(phone: String, purpose: String): SendOtpResponseDto =
+        authApi.sendOtp(phone, purpose)
+
+    override suspend fun verifyOtp(phone: String, otp: String, purpose: String): VerifyOtpResponseDto =
+        authApi.verifyOtp(phone, otp, purpose)
+
+    override suspend fun signUpWithCanonical(request: SignupRequestDto): User {
+        val res = authApi.signup(request)
+        tokenProvider.setTokens(res.token, res.refreshToken)
+        return res.user.toDomain()
     }
+
+    override suspend fun signInWithIdentifier(identifier: String, password: String): User {
+        val res = authApi.login(identifier, password)
+        tokenProvider.setTokens(res.token, res.refreshToken)
+        return res.user.toDomain()
+    }
+
+    override suspend fun requestForgotPasswordOtp(identifier: String): ForgotPasswordRequestResponseDto =
+        authApi.requestForgotPasswordOtp(identifier)
+
+    override suspend fun verifyForgotPasswordOtp(identifier: String, otp: String): ForgotPasswordVerifyResponseDto =
+        authApi.verifyForgotPasswordOtp(identifier, otp)
+
+    override suspend fun resetForgotPassword(resetToken: String, newPassword: String): SimpleMessageResponseDto =
+        authApi.resetForgotPassword(resetToken, newPassword)
+
+    override suspend fun resendConfirmationEmail(email: String?): SimpleMessageResponseDto =
+        authApi.resendConfirmationEmail(email)
+
+    override suspend fun changePhoneRequest(newPhone: String): SendOtpResponseDto =
+        authApi.changePhoneRequest(newPhone)
+
+    override suspend fun changePhoneVerify(newPhone: String, otp: String): SimpleMessageResponseDto =
+        authApi.changePhoneVerify(newPhone, otp)
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String): SimpleMessageResponseDto =
+        authApi.changePassword(currentPassword, newPassword)
+
+    override suspend fun signInWithEmail(email: String, password: String): User =
+        signInWithIdentifier(email, password)
 
     override suspend fun signUpWithEmail(email: String, password: String, name: String?): User {
         auth.signUpWith(Email) {
@@ -527,11 +575,14 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun signOut() {
-        auth.signOut()
+        tokenProvider.clearTokens()
+        try {
+            auth.signOut()
+        } catch (_: Exception) {}
     }
 
     override suspend fun isAuthenticated(): Boolean =
-        auth.currentSessionOrNull() != null
+        tokenProvider.isAuthenticated
 
     override suspend fun getCurrentUser(): User? = try {
         if (isAuthenticated()) userApi.getMe().toDomain() else null

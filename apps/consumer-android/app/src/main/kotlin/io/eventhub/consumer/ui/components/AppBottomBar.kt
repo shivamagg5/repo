@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
@@ -80,26 +79,28 @@ fun AppBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp)
                 .shadow(
-                    elevation = 20.dp,
-                    shape = RoundedCornerShape(32.dp),
-                    spotColor = PulsrPink.copy(alpha = 0.35f),
-                    ambientColor = Color.Black.copy(alpha = 0.8f)
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    spotColor = PulsrPink.copy(alpha = 0.4f),
+                    ambientColor = Color.Black.copy(alpha = 0.85f)
                 )
-                .clip(RoundedCornerShape(32.dp))
-                .background(Surface2Dark.copy(alpha = 0.94f))
+                .clip(RoundedCornerShape(24.dp))
+                .background(SurfaceDark.copy(alpha = 0.96f))
                 .border(
                     width = 1.dp,
                     color = SurfaceBorder,
-                    shape = RoundedCornerShape(32.dp)
+                    shape = RoundedCornerShape(24.dp)
                 )
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavTab.values().forEach { tab ->
@@ -111,7 +112,8 @@ fun AppBottomBar(
                         if (!isSelected) {
                             onTabSelected(tab.screen)
                         }
-                    }
+                    },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -126,57 +128,63 @@ private fun NavTabItem(
     modifier: Modifier = Modifier,
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.05f else 1.0f,
+        targetValue = if (isSelected) 1.08f else 1.0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "tabScale"
     )
 
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) OnPrimary else OnSurfaceLow,
-        label = "tabColor"
+    val iconColor by animateColorAsState(
+        targetValue = if (isSelected) PulsrPink else OnSurfaceLow,
+        label = "tabIconColor"
+    )
+
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) OnSurface else OnSurfaceLow,
+        label = "tabTextColor"
     )
 
     val interactionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = modifier
+            .fillMaxHeight()
             .scale(scale)
-            .clip(RoundedCornerShape(24.dp))
-            .then(
-                if (isSelected) {
-                    Modifier.background(HotGradient)
-                } else {
-                    Modifier
-                }
-            )
+            .clip(RoundedCornerShape(18.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (isSelected) PulsrPink.copy(alpha = 0.14f) else Color.Transparent
+                )
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
             Icon(
                 imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
                 contentDescription = tab.title,
-                tint = contentColor,
-                modifier = Modifier.size(20.dp)
+                tint = iconColor,
+                modifier = Modifier.size(24.dp)
             )
 
-            if (isSelected) {
-                Text(
-                    text = tab.title,
-                    color = contentColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.3.sp
-                )
-            }
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Text(
+                text = tab.title,
+                color = textColor,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                letterSpacing = 0.2.sp,
+                maxLines = 1
+            )
         }
     }
 }

@@ -439,52 +439,72 @@ export function AuthProvider({
 
   // Operations
   const login = useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
       setError(null);
       setStatus('loading');
 
       // Check if credentials match any pre-seeded persona or placeholder mode
-      const trimmedEmail = email.trim().toLowerCase();
-      if (trimmedEmail.includes('admin')) {
+      const trimmed = identifier.trim().toLowerCase();
+      if (trimmed.includes('admin')) {
         return loginAsDemo('admin');
       }
-      if (trimmedEmail.includes('organizer')) {
+      if (trimmed.includes('organizer')) {
         return loginAsDemo('organizer');
       }
-      if (trimmedEmail.includes('venue')) {
+      if (trimmed.includes('venue')) {
         return loginAsDemo('venue');
       }
-      if (trimmedEmail.includes('promoter')) {
+      if (trimmed.includes('promoter')) {
         return loginAsDemo('promoter');
       }
-      if (trimmedEmail.includes('consumer') || isPlaceholderUrl) {
+      if (trimmed.includes('consumer') && isPlaceholderUrl) {
         return loginAsDemo('consumer');
       }
 
-      const result = await signInWithEmail(supabase, email, password);
-      if (result.error) {
-        // In local development, fall back gracefully to a consumer demo session if Supabase is offline
+      try {
+        // Unified login through canonical API (supports Email OR Mobile Number)
+        const res = await apiClient.loginWithCredentials<{ session: any; profile: UserProfile }>(
+          identifier.trim(),
+          password,
+        );
+        if (res.data?.session) {
+          const sess = res.data.session;
+          if (typeof window !== 'undefined') {
+            document.cookie = `sb-access-token=${sess.access_token}; path=/; max-age=86400; SameSite=Lax`;
+          }
+          setSession(sess);
+          setUser(sess.user ?? ({ id: res.data.profile.id, email: res.data.profile.email } as any));
+          setProfile(res.data.profile);
+          setStatus('authenticated');
+          return { success: true };
+        }
+      } catch (apiErr: any) {
+        if (trimmed.includes('@') && !isPlaceholderUrl) {
+          // Fallback to direct client Supabase sign in if email
+          const result = await signInWithEmail(supabase, identifier, password);
+          if (!result.error && result.session) {
+            if (typeof window !== 'undefined') {
+              document.cookie = `sb-access-token=${result.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
+            }
+            setSession(result.session);
+            setUser(result.session.user);
+            await hydrateProfile(result.session);
+            return { success: true };
+          }
+        }
         if (isPlaceholderUrl) {
           return loginAsDemo('consumer');
         }
-        const userMsg = mapAuthError(result.error);
+        const userMsg = apiErr?.message || mapAuthError(apiErr);
         setError(userMsg);
         setStatus('unauthenticated');
         return { success: false, error: userMsg };
       }
-      if (result.session) {
-        if (typeof window !== 'undefined') {
-          document.cookie = `sb-access-token=${result.session.access_token}; path=/; max-age=86400; SameSite=Lax`;
-        }
-        setSession(result.session);
-        setUser(result.session.user);
-        await hydrateProfile(result.session);
-        return { success: true };
-      }
+
       setStatus('unauthenticated');
       return { success: false, error: 'Login failed. Please try again.' };
     },
-    [supabase, isPlaceholderUrl, loginAsDemo, hydrateProfile],
+    [apiClient, supabase, isPlaceholderUrl, loginAsDemo, hydrateProfile],
   );
 
   const register = useCallback(

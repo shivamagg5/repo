@@ -7,6 +7,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -145,10 +147,10 @@ fun WaitingRoomBottomSheet(
                         style = Stroke(width = 8.dp.toPx())
                     )
 
-                    // Progress Arc with Pulsr neon gradient
+                    // Progress Arc with Pulsr radar sweep
                     drawArc(
                         brush = Brush.sweepGradient(
-                            listOf(PulsrPink, PulsrFlame, PulsrAcid, PulsrNeon, PulsrPink)
+                            listOf(Color.Transparent, PulsrPink.copy(alpha = 0.3f), PulsrPink)
                         ),
                         startAngle = rotationAngle,
                         sweepAngle = 280f,
@@ -227,14 +229,27 @@ fun WaitingRoomBottomSheet(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            Text(
-                text = "⚠️ Do not close the app. Once you reach the front, your 10-minute pass reservation window will start immediately.",
-                style = MaterialTheme.typography.labelSmall,
-                color = OnSurfaceMedium,
-                textAlign = TextAlign.Center,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = OnSurfaceMedium,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Do not close the app. Once you reach the front, your 10-minute pass reservation window will start immediately.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = OnSurfaceMedium,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 

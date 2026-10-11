@@ -69,10 +69,10 @@ android {
         create("staging") {
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
-            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.66:3001/api/v1\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://event-platform-api-r4og.onrender.com/api/v1\"")
         }
         create("production") {
-            buildConfigField("String", "API_BASE_URL", "\"https://api.eventhub.io/api/v1\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://event-platform-api-r4og.onrender.com/api/v1\"")
         }
     }
 

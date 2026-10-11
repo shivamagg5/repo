@@ -16,16 +16,24 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -42,6 +50,7 @@ import com.slack.circuit.runtime.CircuitContext
 import com.slack.circuit.runtime.screen.Screen
 import com.slack.circuit.runtime.ui.Ui
 import com.slack.circuit.runtime.ui.ui
+import io.eventhub.consumer.data.local.UserPreferencesStore
 import io.eventhub.consumer.domain.model.Event
 import io.eventhub.consumer.ui.components.ErrorState
 import io.eventhub.consumer.ui.components.HomeShimmerLoading
@@ -61,8 +70,9 @@ class HomeUiFactory : Ui.Factory {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(state: HomeState, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var selectedCategory by remember { mutableStateOf("All") }
-    var selectedCity by remember { mutableStateOf("Mumbai") }
+    var selectedCity by remember { mutableStateOf(UserPreferencesStore.getSavedCity(context)) }
     var showCitySheet by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -106,8 +116,9 @@ fun HomeScreen(state: HomeState, modifier: Modifier = Modifier) {
     if (showCitySheet) {
         CitySelectionBottomSheet(
             currentCity = selectedCity,
-            onCitySelected = {
-                selectedCity = it
+            onCitySelected = { newCity ->
+                UserPreferencesStore.saveCity(context, newCity)
+                selectedCity = newCity
                 showCitySheet = false
             },
             onDismiss = { showCitySheet = false }
@@ -124,17 +135,6 @@ private fun PulsrTopBar(
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulseLogo")
-    val pulseAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "spinStar"
-    )
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,15 +148,23 @@ private fun PulsrTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "✳",
-                fontSize = 24.sp,
-                color = PulsrAcid,
-                modifier = Modifier.rotate(pulseAngle)
-            )
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(HotGradient),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.GraphicEq,
+                    contentDescription = null,
+                    tint = OnPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             Text(
                 text = "PULSR",
-                fontSize = 22.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp,
                 color = OnSurface
@@ -315,7 +323,7 @@ private fun PulsrHomeContent(
             item {
                 SectionHeader(
                     title = "Trending Right Now",
-                    badgeText = "SELLING FAST 🔥",
+                    badgeText = "POPULAR",
                     showSeeAll = true,
                     onSeeAllClick = onSearchClick
                 )
@@ -340,7 +348,7 @@ private fun PulsrHomeContent(
         item {
             SectionHeader(
                 title = "Near You This Weekend",
-                badgeText = "POPULAR",
+                badgeText = "FEATURED",
                 showSeeAll = false
             )
             Spacer(Modifier.height(14.dp))
@@ -375,29 +383,37 @@ private fun MarqueeTickerStrip() {
             .fillMaxWidth()
             .background(Surface2Dark)
             .border(width = 0.5.dp, color = SurfaceBorder)
-            .padding(vertical = 10.dp)
+            .padding(vertical = 10.dp, horizontal = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TickerBadge(icon = "⚡", text = "15L+ PARTYGOERS")
-            Text("✦", color = PulsrFlame, fontSize = 10.sp)
-            TickerBadge(icon = "📍", text = "100+ CITIES")
-            Text("✦", color = PulsrAcid, fontSize = 10.sp)
-            TickerBadge(icon = "🎟️", text = "ZERO HIDDEN FEES")
+            TickerBadge(icon = Icons.Outlined.People, text = "15L+ ATTENDEES")
+            Text("•", color = OnSurfaceLow, fontSize = 10.sp)
+            TickerBadge(icon = Icons.Outlined.LocationCity, text = "100+ CITIES")
+            Text("•", color = OnSurfaceLow, fontSize = 10.sp)
+            TickerBadge(icon = Icons.Outlined.Shield, text = "100% VERIFIED")
         }
     }
 }
 
 @Composable
-private fun TickerBadge(icon: String, text: String) {
+private fun TickerBadge(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(text = icon, fontSize = 12.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = PulsrPink,
+            modifier = Modifier.size(13.dp)
+        )
         Text(
             text = text,
             fontSize = 11.sp,
@@ -551,50 +567,37 @@ private fun CategoryChipsRow(
 ) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(categories) { cat ->
             val isSelected = cat == selectedCategory
-            val emoji = when (cat) {
-                "All" -> "⚡"
-                "Festivals" -> "🎪"
-                "Garba" -> "🪔"
-                "Raves" -> "⚡"
-                "Comedy" -> "🎤"
-                "College" -> "🎓"
-                "Wellness" -> "🧘"
-                else -> "🎟️"
-            }
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .then(
                         if (isSelected) {
                             Modifier
                                 .background(HotGradient)
-                                .border(1.dp, PulsrPink, RoundedCornerShape(20.dp))
+                                .border(1.dp, PulsrPink, RoundedCornerShape(18.dp))
                         } else {
                             Modifier
                                 .background(SurfaceDark)
-                                .border(1.dp, SurfaceBorder, RoundedCornerShape(20.dp))
+                                .border(1.dp, SurfaceBorder, RoundedCornerShape(18.dp))
                         }
                     )
                     .clickable { onCategorySelect(cat) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(text = emoji, fontSize = 12.sp)
-                    Text(
-                        text = cat,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) OnPrimary else OnSurfaceMedium
-                    )
-                }
+                Text(
+                    text = cat,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) OnPrimary else OnSurfaceMedium,
+                    letterSpacing = 0.2.sp
+                )
             }
         }
     }
@@ -649,14 +652,19 @@ private fun TrendingEventCard(
                     modifier = Modifier
                         .padding(12.dp)
                         .align(Alignment.TopStart)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xCC0A0910))
-                        .border(1.dp, PulsrFlame.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .border(1.dp, PulsrFlame.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Text(text = "🔥", fontSize = 10.sp)
+                    Icon(
+                        imageVector = Icons.Outlined.LocalFireDepartment,
+                        contentDescription = null,
+                        tint = PulsrFlame,
+                        modifier = Modifier.size(12.dp)
+                    )
                     Text(
                         text = "Selling Fast",
                         fontSize = 10.sp,
@@ -898,14 +906,16 @@ private fun AppPerksSection() {
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             PerkCard(
-                icon = "⚡",
+                icon = Icons.Outlined.QrCodeScanner,
+                iconTint = PulsrPink,
                 title = "Instant Passes",
                 subtitle = "Digital offline QR entry",
                 modifier = Modifier.weight(1f)
             )
             PerkCard(
-                icon = "🔒",
-                title = "Anti-Scalp",
+                icon = Icons.Outlined.Shield,
+                iconTint = PulsrAcid,
+                title = "Anti-Scalping",
                 subtitle = "ECDSA hardware verified",
                 modifier = Modifier.weight(1f)
             )
@@ -915,31 +925,47 @@ private fun AppPerksSection() {
 
 @Composable
 private fun PerkCard(
-    icon: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
+            .height(116.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(SurfaceDark)
             .border(1.dp, SurfaceBorder, RoundedCornerShape(16.dp))
             .padding(14.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = icon, fontSize = 20.sp)
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = OnSurface,
-                fontWeight = FontWeight.Bold
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = OnSurfaceLow
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OnSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurfaceLow,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -1011,20 +1037,55 @@ private fun CitySelectionBottomSheet(
     onCitySelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val cities = listOf("Mumbai", "Delhi NCR", "Bengaluru", "Goa", "Pune", "Hyderabad", "Kolkata")
+    val popularCities = remember {
+        listOf(
+            "Mumbai", "Delhi NCR", "Bengaluru", "Goa", "Pune",
+            "Hyderabad", "Kolkata", "Chennai", "Ahmedabad", "Jaipur", "Chandigarh"
+        )
+    }
+
+    val allIndianCities = remember {
+        listOf(
+            "Agra", "Ahmedabad", "Ajmer", "Aligarh", "Allahabad (Prayagraj)", "Amritsar", "Aurangabad",
+            "Bengaluru", "Bareilly", "Bhopal", "Bhubaneswar", "Bikaner", "Chandigarh", "Chennai",
+            "Coimbatore", "Cuttack", "Dehradun", "Delhi NCR", "Dhanbad", "Faridabad", "Ghaziabad",
+            "Goa", "Gorakhpur", "Guntur", "Gurgaon (Gurugram)", "Guwahati", "Gwalior", "Hubli",
+            "Hyderabad", "Indore", "Jabalpur", "Jaipur", "Jalandhar", "Jammu", "Jamshedpur",
+            "Jodhpur", "Kanpur", "Kochi", "Kolhapur", "Kolkata", "Kota", "Kozhikode", "Lucknow",
+            "Ludhiana", "Madurai", "Mangalore", "Meerut", "Moradabad", "Mumbai", "Mysore", "Nagpur",
+            "Nashik", "Navi Mumbai", "Noida", "Patna", "Prayagraj", "Pune", "Raipur", "Rajkot",
+            "Ranchi", "Salem", "Shimla", "Siliguri", "Srinagar", "Surat", "Thane",
+            "Thiruvananthapuram", "Tiruchirappalli", "Udaipur", "Ujjain", "Vadodara", "Varanasi",
+            "Vijayawada", "Visakhapatnam", "Warangal"
+        )
+    }
+
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredCities = remember(searchQuery) {
+        if (searchQuery.isBlank()) {
+            allIndianCities
+        } else {
+            val q = searchQuery.trim().lowercase()
+            allIndianCities.filter { it.lowercase().contains(q) }
+        }
+    }
+
+    val isCustomCityNeeded = remember(searchQuery, filteredCities) {
+        searchQuery.isNotBlank() && filteredCities.none { it.equals(searchQuery.trim(), ignoreCase = true) }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
-        scrimColor = Color.Black.copy(alpha = 0.7f),
+        scrimColor = Color.Black.copy(alpha = 0.75f),
         dragHandle = { BottomSheetDefaults.DragHandle(color = SurfaceBorder) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxHeight(0.85f)
+                .padding(horizontal = 20.dp)
         ) {
             Text(
                 text = "Choose your city",
@@ -1032,35 +1093,232 @@ private fun CitySelectionBottomSheet(
                 color = OnSurface,
                 fontWeight = FontWeight.Bold
             )
+            Text(
+                text = "Discover raves, concerts & festivals in your region",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurfaceLow
+            )
 
-            cities.forEach { city ->
-                val isSelected = city == currentCity
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) Surface2Dark else Color.Transparent)
-                        .clickable { onCitySelected(city) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Search Bar for all cities in India
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
                     Text(
-                        text = city,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) PulsrPink else OnSurface,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        text = "Search all cities in India...",
+                        color = OnSurfaceLow,
+                        fontSize = 14.sp
                     )
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
-                            contentDescription = "Selected",
-                            tint = PulsrPink,
-                            modifier = Modifier.size(18.dp)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search",
+                        tint = PulsrPink,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Clear",
+                                tint = OnSurfaceLow,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Surface2Dark,
+                    unfocusedContainerColor = Surface2Dark,
+                    focusedBorderColor = PulsrPink,
+                    unfocusedBorderColor = SurfaceBorder,
+                    focusedTextColor = OnSurface,
+                    unfocusedTextColor = OnSurface
+                ),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // If user types a custom city name not in list, show quick select option
+                if (isCustomCityNeeded) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Surface2Dark,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, PulsrAcid.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onCitySelected(searchQuery.trim()) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.LocationOn,
+                                    contentDescription = null,
+                                    tint = PulsrAcid,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Select \"${searchQuery.trim()}\"",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PulsrAcid
+                                    )
+                                    Text(
+                                        text = "Set as default city for India events",
+                                        fontSize = 11.sp,
+                                        color = OnSurfaceLow
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                // Popular Cities Section (when search query is blank)
+                if (searchQuery.isBlank()) {
+                    item {
+                        Text(
+                            text = "TOP CITIES",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = PulsrPink,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
+                    }
+
+                    item {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            items(popularCities) { city ->
+                                val isSelected = city.equals(currentCity, ignoreCase = true)
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = if (isSelected) PulsrPink.copy(alpha = 0.18f) else Surface2Dark,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) PulsrPink else SurfaceBorder
+                                    ),
+                                    modifier = Modifier.clickable { onCitySelected(city) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = city,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) PulsrPink else OnSurface
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.CheckCircle,
+                                                contentDescription = null,
+                                                tint = PulsrPink,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "ALL CITIES IN INDIA",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = OnSurfaceLow,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                // Filtered List
+                items(filteredCities) { city ->
+                    val isSelected = city.equals(currentCity, ignoreCase = true)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) Surface2Dark else Color.Transparent)
+                            .clickable { onCitySelected(city) }
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                tint = if (isSelected) PulsrPink else OnSurfaceLow,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = city,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (isSelected) PulsrPink else OnSurface,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Outlined.CheckCircle,
+                                contentDescription = "Selected",
+                                tint = PulsrPink,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (filteredCities.isEmpty() && !isCustomCityNeeded) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No cities matching \"$searchQuery\"",
+                                color = OnSurfaceLow,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+

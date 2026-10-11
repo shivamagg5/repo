@@ -241,13 +241,25 @@ private fun EventDetailContent(
                         shape = RoundedCornerShape(6.dp),
                         color = PulsrAcid.copy(alpha = 0.15f)
                     ) {
-                        Text(
-                            text = "VERIFIED EVENT ✓",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PulsrAcid,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Verified,
+                                contentDescription = null,
+                                tint = PulsrAcid,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "VERIFIED EVENT",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PulsrAcid,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -288,7 +300,7 @@ private fun EventDetailContent(
                     InfoTile(
                         icon = Icons.Outlined.Person,
                         title = org.name,
-                        subtitle = if (org.verified) "Verified Organizer ✓" else "Event Organizer"
+                        subtitle = if (org.verified) "Verified Organizer" else "Event Organizer"
                     )
                 }
             }
@@ -384,23 +396,31 @@ private fun ArenaZonePreviewCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(32.dp)
+                    .height(34.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Brush.horizontalGradient(listOf(PulsrPink, PulsrFlame, PulsrNeon))),
+                    .background(Surface2Dark)
+                    .border(1.dp, SurfaceBorder, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "★ MAIN STAGE / DJ DECK ★",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(PulsrPink))
+                    Text(
+                        text = "MAIN STAGE & AUDIO RIG",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OnSurface,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(PulsrPink))
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3 Zone Clickable Blocks
+            // 3 Zone Clickable Blocks with Equal Sizing
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -415,7 +435,7 @@ private fun ArenaZonePreviewCard(
                 )
                 ArenaZonePill(
                     title = "Standing Arena",
-                    subtitle = "Laser Dancefloor",
+                    subtitle = "Main Floor",
                     accentColor = PulsrPink,
                     isSelected = selectedZone == "standing",
                     onClick = { onSelectZone("standing") },
@@ -423,7 +443,7 @@ private fun ArenaZonePreviewCard(
                 )
                 ArenaZonePill(
                     title = "Grandstand",
-                    subtitle = "Stadium Seating",
+                    subtitle = "Stadium Tier",
                     accentColor = PulsrNeon,
                     isSelected = selectedZone == "grandstand",
                     onClick = { onSelectZone("grandstand") },
@@ -440,19 +460,20 @@ private fun ArenaZonePreviewCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = when (selectedZone) {
-                            "pit" -> "👁 Direct Eye-Level View • 5m from Headliner"
-                            "standing" -> "🔊 Immersive Festival Acoustic & Laser Zone"
-                            "grandstand" -> "🏟 Panoramic Stadium Overview • Reserved Seats"
-                            else -> "Select a zone to preview the viewpoint"
+                            "pit" -> "Direct Eye-Level View • 5m from Headliner"
+                            "standing" -> "Immersive Production & Acoustic Arena"
+                            "grandstand" -> "Panoramic Stadium Overview • Reserved Seats"
+                            else -> "Select a zone to preview sightline"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = OnSurfaceMedium
+                        color = OnSurfaceMedium,
+                        fontSize = 11.sp
                     )
                     Text(
                         text = "100% Sightline",
@@ -483,12 +504,16 @@ private fun ArenaZonePill(
             if (isSelected) accentColor else SurfaceBorder
         ),
         modifier = modifier
+            .height(58.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = title,
@@ -496,15 +521,19 @@ private fun ArenaZonePill(
                 color = if (isSelected) accentColor else OnSurface,
                 fontWeight = FontWeight.Bold,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                fontSize = 10.sp
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceLow,
-                fontSize = 8.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                fontSize = 9.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

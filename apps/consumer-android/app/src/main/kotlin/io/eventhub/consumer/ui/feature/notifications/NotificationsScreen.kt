@@ -197,7 +197,7 @@ fun NotificationsScreen(state: NotificationsState, modifier: Modifier = Modifier
                 }
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 128.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         items(state.notifications, key = { it.id }) { item ->

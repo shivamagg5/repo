@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -220,7 +222,7 @@ fun SearchScreen(state: SearchState, modifier: Modifier = Modifier) {
                 }
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 128.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         item {
@@ -267,7 +269,9 @@ private fun DiscoverySuggestionsView(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(bottom = 128.dp)
     ) {
         // Trending Searches Header
         Row(
@@ -300,20 +304,11 @@ private fun DiscoverySuggestionsView(
             "Zakir Khan Live",
             "Boiler Room India"
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
-            trendingQueries.take(3).forEach { term ->
-                TrendingChip(term = term, onClick = { onTrendingClick(term) })
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            trendingQueries.drop(3).forEach { term ->
+            items(trendingQueries) { term ->
                 TrendingChip(term = term, onClick = { onTrendingClick(term) })
             }
         }
@@ -382,13 +377,15 @@ private fun TrendingChip(term: String, onClick: () -> Unit) {
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = "⚡",
-                fontSize = 11.sp
+            Icon(
+                imageVector = Icons.Outlined.TrendingUp,
+                contentDescription = null,
+                tint = PulsrFlame,
+                modifier = Modifier.size(13.dp)
             )
             Text(
                 text = term,
@@ -413,13 +410,14 @@ private fun CurationCard(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 96.dp)
             .border(1.dp, SurfaceBorder, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {

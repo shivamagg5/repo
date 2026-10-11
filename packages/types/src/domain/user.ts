@@ -8,6 +8,13 @@ export interface User {
   name: string;
   avatarUrl: string | null;
   status: UserStatus;
+  phoneVerified: boolean;
+  emailVerified: boolean;
+  dob: string | null;
+  whatsappConsent: boolean;
+  whatsappConsentUpdatedAt: string | null;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +27,11 @@ export interface UserProfile {
   avatarUrl: string | null;
   status: UserStatus;
   role?: string | null;
+  phoneVerified: boolean;
+  emailVerified: boolean;
+  dob: string | null;
+  whatsappConsent: boolean;
+  termsAcceptedAt: string | null;
   createdAt: string;
 }
 
@@ -35,11 +47,16 @@ export interface CreateUserInput {
   phone?: string;
   name: string;
   avatarUrl?: string;
+  dob?: string;
+  whatsappConsent?: boolean;
+  termsAccepted?: boolean;
 }
 
 export interface UpdateUserInput {
   name?: string;
   phone?: string;
   avatarUrl?: string;
+  dob?: string;
+  whatsappConsent?: boolean;
   // BLOCKED: supabaseAuthId, email, status, role, permissions, organizationId
 }

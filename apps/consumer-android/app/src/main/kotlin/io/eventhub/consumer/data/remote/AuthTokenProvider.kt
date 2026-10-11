@@ -13,19 +13,40 @@ import javax.inject.Singleton
 class AuthTokenProvider @Inject constructor(
     private val supabaseAuth: Auth,
 ) {
+    @Volatile
+    private var customAccessToken: String? = null
+
+    @Volatile
+    private var customRefreshToken: String? = null
+
+    fun setTokens(token: String, refreshToken: String? = null) {
+        customAccessToken = token
+        customRefreshToken = refreshToken
+    }
+
+    fun clearTokens() {
+        customAccessToken = null
+        customRefreshToken = null
+    }
+
     suspend fun getAccessToken(): String? =
-        supabaseAuth.currentSessionOrNull()?.accessToken
+        customAccessToken ?: supabaseAuth.currentSessionOrNull()?.accessToken
 
     suspend fun getRefreshToken(): String? =
-        supabaseAuth.currentSessionOrNull()?.refreshToken
+        customRefreshToken ?: supabaseAuth.currentSessionOrNull()?.refreshToken
 
     suspend fun refreshAndGetToken(): String? = try {
         supabaseAuth.refreshCurrentSession()
-        supabaseAuth.currentSessionOrNull()?.accessToken
+        val refreshed = supabaseAuth.currentSessionOrNull()?.accessToken
+        if (refreshed != null) {
+            customAccessToken = refreshed
+        }
+        refreshed ?: customAccessToken
     } catch (e: Exception) {
-        null
+        customAccessToken
     }
 
     val isAuthenticated: Boolean
-        get() = supabaseAuth.currentSessionOrNull() != null
+        get() = (customAccessToken != null && customAccessToken!!.isNotBlank()) ||
+                supabaseAuth.currentSessionOrNull() != null
 }

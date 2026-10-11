@@ -890,6 +890,87 @@ export class ApiClient {
   async getPromoterGuestlists<T>(eventId: string): Promise<ApiSuccess<T>> {
     return this.get<T>(`/promoter/guestlists/${encodeURIComponent(eventId)}`);
   }
+
+  // ---------------------------------------------------------------------------
+  // Canonical Authentication & Identity Endpoints
+  // ---------------------------------------------------------------------------
+  async sendOtp<T = { success: boolean; message: string; cooldownSeconds: number }>(
+    destination: string,
+    purpose: 'signup' | 'forgot_password' | 'phone_change',
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/otp/send', { destination, purpose });
+  }
+
+  async verifyOtp<T = { success: boolean; verificationToken: string }>(
+    destination: string,
+    otp: string,
+    purpose: 'signup' | 'forgot_password' | 'phone_change',
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/otp/verify', { destination, otp, purpose });
+  }
+
+  async signup<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/signup', body);
+  }
+
+  async loginWithCredentials<T>(identifier: string, password: string): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/login', { identifier, password });
+  }
+
+  async requestForgotPasswordOtp<T = { success: boolean; message: string }>(
+    identifier: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/forgot-password/request', { identifier });
+  }
+
+  async verifyForgotPasswordOtp<T = { success: boolean; resetToken: string }>(
+    identifier: string,
+    otp: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/forgot-password/verify', { identifier, otp });
+  }
+
+  async resetForgotPassword<T = { success: boolean; message: string }>(
+    body: unknown,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/forgot-password/reset', body);
+  }
+
+  async resendConfirmationEmail<T = { success: boolean; message: string }>(
+    email?: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/resend-confirmation-email', email ? { email } : {});
+  }
+
+  async changePhoneRequest<T = { success: boolean; message: string; cooldownSeconds?: number }>(
+    newPhone: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/phone/change/request', { newPhone });
+  }
+
+  async changePhoneVerify<T = { success: boolean; message: string }>(
+    newPhone: string,
+    otp: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/phone/change/verify', { newPhone, otp });
+  }
+
+  async changeEmailRequest<T = { success: boolean; message: string }>(
+    newEmail: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/email/change/request', { newEmail });
+  }
+
+  async changePassword<T = { success: boolean; message: string }>(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<ApiSuccess<T>> {
+    return this.post<T>('/auth/password/change', { currentPassword, newPassword });
+  }
+
+  async updateConsumerProfile<T>(body: unknown): Promise<ApiSuccess<T>> {
+    return this.patch<T>('/users/me', body);
+  }
 }
 
 

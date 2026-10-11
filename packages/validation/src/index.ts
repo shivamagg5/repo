@@ -648,6 +648,88 @@ export const scannerOnboardSchema = z.object({
   publicKeyPem: z.string().min(30),
 }).strict();
 
+// ---------------------------------------------------------------------------
+// CANONICAL AUTHENTICATION SCHEMAS
+// ---------------------------------------------------------------------------
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(100, 'Password must not exceed 100 characters');
+
+export const phoneE164Schema = z
+  .string()
+  .regex(/^\+[1-9]\d{6,14}$/, 'Phone number must be in valid E.164 format (e.g. +919876543210)');
+
+export const sendOtpSchema = z.object({
+  destination: z.string().min(3).max(100),
+  purpose: z.enum(['signup', 'forgot_password', 'phone_change']),
+}).strict();
+
+export const verifyOtpSchema = z.object({
+  destination: z.string().min(3).max(100),
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+  purpose: z.enum(['signup', 'forgot_password', 'phone_change']),
+}).strict();
+
+export const signupSchema = z.object({
+  phone: phoneE164Schema,
+  phoneVerificationToken: z.string().min(16, 'Invalid verification token'),
+  email: emailSchema,
+  password: passwordSchema,
+  name: z.string().min(1, 'Full name is required').max(100),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must be YYYY-MM-DD'),
+  whatsappConsent: z.boolean().default(false),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'You must agree to the Terms and Conditions and Privacy Policy.' }),
+  }),
+  termsVersion: z.string().default('1.0'),
+}).strict();
+
+export const loginSchema = z.object({
+  identifier: z.string().min(3, 'Email or mobile number is required').max(100),
+  password: z.string().min(1, 'Password is required'),
+}).strict();
+
+export const forgotPasswordRequestSchema = z.object({
+  identifier: z.string().min(3, 'Email or mobile number is required').max(100),
+}).strict();
+
+export const forgotPasswordVerifySchema = z.object({
+  identifier: z.string().min(3).max(100),
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+}).strict();
+
+export const forgotPasswordResetSchema = z.object({
+  identifier: z.string().min(3).max(100),
+  resetToken: z.string().min(16, 'Invalid reset token'),
+  newPassword: passwordSchema,
+}).strict();
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: passwordSchema,
+}).strict();
+
+export const changePhoneRequestSchema = z.object({
+  newPhone: phoneE164Schema,
+}).strict();
+
+export const changePhoneVerifySchema = z.object({
+  newPhone: phoneE164Schema,
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+}).strict();
+
+export const changeEmailRequestSchema = z.object({
+  newEmail: emailSchema,
+}).strict();
+
+export const updateConsumerProfileSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  avatarUrl: z.string().url().optional(),
+  whatsappConsent: z.boolean().optional(),
+}).strict();
+
 // Re-export zod for convenience
 export { z };
 

@@ -189,7 +189,7 @@ fun TicketsScreen(state: TicketsState, modifier: Modifier = Modifier) {
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                            contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 128.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(filteredTickets, key = { it.id }) { ticket ->
@@ -220,18 +220,6 @@ fun TicketCardItem(
             .clickable(onClick = onClick)
     ) {
         Column {
-            // Holographic security accent bar on top
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(PulsrPink, PulsrFlame, PulsrAcid, PulsrNeon)
-                        )
-                    )
-            )
-
             // Upper Pass Details
             Row(
                 modifier = Modifier.padding(14.dp),

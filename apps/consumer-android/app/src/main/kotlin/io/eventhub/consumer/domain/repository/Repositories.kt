@@ -49,12 +49,29 @@ data class PaymentIntent(
 
 interface UserRepository {
     suspend fun getMe(): User
-    suspend fun updateMe(name: String?, phone: String?, avatarUrl: String?): User
+    suspend fun updateMe(
+        name: String? = null,
+        phone: String? = null,
+        avatarUrl: String? = null,
+        dob: String? = null,
+        whatsappConsent: Boolean? = null,
+    ): User
     suspend fun registerDeviceToken(fcmToken: String)
     suspend fun getNotifications(): List<NotificationItem>
 }
 
 interface AuthRepository {
+    suspend fun sendOtp(phone: String, purpose: String = "SIGNUP"): io.eventhub.consumer.data.remote.dto.SendOtpResponseDto
+    suspend fun verifyOtp(phone: String, otp: String, purpose: String = "SIGNUP"): io.eventhub.consumer.data.remote.dto.VerifyOtpResponseDto
+    suspend fun signUpWithCanonical(request: io.eventhub.consumer.data.remote.dto.SignupRequestDto): User
+    suspend fun signInWithIdentifier(identifier: String, password: String): User
+    suspend fun requestForgotPasswordOtp(identifier: String): io.eventhub.consumer.data.remote.dto.ForgotPasswordRequestResponseDto
+    suspend fun verifyForgotPasswordOtp(identifier: String, otp: String): io.eventhub.consumer.data.remote.dto.ForgotPasswordVerifyResponseDto
+    suspend fun resetForgotPassword(resetToken: String, newPassword: String): io.eventhub.consumer.data.remote.dto.SimpleMessageResponseDto
+    suspend fun resendConfirmationEmail(email: String? = null): io.eventhub.consumer.data.remote.dto.SimpleMessageResponseDto
+    suspend fun changePhoneRequest(newPhone: String): io.eventhub.consumer.data.remote.dto.SendOtpResponseDto
+    suspend fun changePhoneVerify(newPhone: String, otp: String): io.eventhub.consumer.data.remote.dto.SimpleMessageResponseDto
+    suspend fun changePassword(currentPassword: String, newPassword: String): io.eventhub.consumer.data.remote.dto.SimpleMessageResponseDto
     suspend fun signInWithEmail(email: String, password: String): User
     suspend fun signUpWithEmail(email: String, password: String, name: String?): User
     suspend fun signInWithGoogle(idToken: String): User

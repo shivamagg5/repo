@@ -141,6 +141,11 @@ data class User(
     val avatarUrl: String?,
     val phone: String?,
     val role: String,
+    val phoneVerified: Boolean = false,
+    val emailVerified: Boolean = false,
+    val dob: String? = null,
+    val whatsappConsent: Boolean = false,
+    val termsAcceptedAt: String? = null,
 )
 
 data class Category(val id: String, val name: String, val iconUrl: String?)

@@ -12,18 +12,19 @@ function LoginForm() {
 
   const { login, loginAsDemo, loginWithGoogle, loginWithApple, error: authError, clearError } = useAuth();
 
-  const [email, setEmail] = useState('consumer1@staging.eventplatform.com');
+  const [identifier, setIdentifier] = useState('consumer1@staging.eventplatform.com');
   const [password, setPassword] = useState('Consumer@12345');
+  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null); clearError();
-    if (!email.trim() || !password) { setLocalError('Please fill in both fields.'); return; }
+    if (!identifier.trim() || !password) { setLocalError('Please fill in both fields.'); return; }
     setSubmitting(true);
     try {
-      const res = await login(email.trim(), password);
+      const res = await login(identifier.trim(), password);
       if (res.success) { window.location.href = redirectTo; }
       else if (res.error) { setLocalError(res.error); }
     } catch { setLocalError('Unexpected error. Try again.'); }
@@ -144,30 +145,52 @@ function LoginForm() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '8px', fontFamily: 'var(--font-body)' }}>
-                Email
+                Email or Mobile Number
               </label>
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={identifier}
+                onChange={e => setIdentifier(e.target.value)}
+                placeholder="you@example.com or +91 98765 43210"
                 className="login-input"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '8px', fontFamily: 'var(--font-body)' }}>
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="login-input"
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', fontFamily: 'var(--font-body)' }}>
+                  Password
+                </label>
+                <Link
+                  href="/auth/forgot-password"
+                  style={{ fontSize: '11px', color: 'var(--pink)', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="login-input"
+                  style={{ paddingRight: '48px', width: '100%' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: '12px',
+                    cursor: 'pointer', padding: '4px',
+                  }}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
 
             <button

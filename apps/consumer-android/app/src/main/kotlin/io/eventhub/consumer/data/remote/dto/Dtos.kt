@@ -191,6 +191,11 @@ data class UserDto(
     @SerialName("avatarUrl") val avatarUrl: String? = null,
     val phone: String? = null,
     val role: String = "CONSUMER",
+    @SerialName("phoneVerified") val phoneVerified: Boolean = false,
+    @SerialName("emailVerified") val emailVerified: Boolean = false,
+    val dob: String? = null,
+    @SerialName("whatsappConsent") val whatsappConsent: Boolean = false,
+    @SerialName("termsAcceptedAt") val termsAcceptedAt: String? = null,
     @SerialName("createdAt") val createdAt: String? = null,
 )
 
@@ -198,7 +203,123 @@ data class UserDto(
 data class UpdateUserRequestDto(
     val name: String? = null,
     val phone: String? = null,
+    val dob: String? = null,
+    val whatsappConsent: Boolean? = null,
     @SerialName("avatarUrl") val avatarUrl: String? = null,
+)
+
+// ─── Auth DTOs ────────────────────────────────────────────────────────────────
+
+@Serializable
+data class SendOtpRequestDto(
+    val phone: String,
+    val purpose: String = "SIGNUP",
+)
+
+@Serializable
+data class SendOtpResponseDto(
+    val success: Boolean = true,
+    val message: String = "",
+    val cooldownSeconds: Int = 60,
+)
+
+@Serializable
+data class VerifyOtpRequestDto(
+    val phone: String,
+    val otp: String,
+    val purpose: String = "SIGNUP",
+)
+
+@Serializable
+data class VerifyOtpResponseDto(
+    val success: Boolean = true,
+    val verificationToken: String = "",
+    val message: String = "",
+)
+
+@Serializable
+data class SignupRequestDto(
+    val email: String,
+    val password: String,
+    val name: String,
+    val phone: String,
+    val verificationToken: String,
+    val dob: String,
+    val whatsappConsent: Boolean = false,
+    val termsAccepted: Boolean = true,
+)
+
+@Serializable
+data class LoginRequestDto(
+    val identifier: String,
+    val password: String,
+)
+
+@Serializable
+data class AuthResponseDto(
+    val token: String,
+    val refreshToken: String? = null,
+    val user: UserDto,
+)
+
+@Serializable
+data class ForgotPasswordRequestDto(
+    val identifier: String,
+)
+
+@Serializable
+data class ForgotPasswordRequestResponseDto(
+    val success: Boolean = true,
+    val message: String = "",
+    val destination: String = "",
+    val cooldownSeconds: Int = 60,
+)
+
+@Serializable
+data class ForgotPasswordVerifyRequestDto(
+    val identifier: String,
+    val otp: String,
+)
+
+@Serializable
+data class ForgotPasswordVerifyResponseDto(
+    val success: Boolean = true,
+    val resetToken: String = "",
+    val message: String = "",
+)
+
+@Serializable
+data class ForgotPasswordResetRequestDto(
+    val resetToken: String,
+    val newPassword: String,
+)
+
+@Serializable
+data class ResendConfirmationEmailRequestDto(
+    val email: String? = null,
+)
+
+@Serializable
+data class ChangePhoneRequestDto(
+    val newPhone: String,
+)
+
+@Serializable
+data class ChangePhoneVerifyDto(
+    val newPhone: String,
+    val otp: String,
+)
+
+@Serializable
+data class ChangePasswordRequestDto(
+    val currentPassword: String,
+    val newPassword: String,
+)
+
+@Serializable
+data class SimpleMessageResponseDto(
+    val success: Boolean = true,
+    val message: String = "",
 )
 
 // ─── Notification DTOs ───────────────────────────────────────────────────────

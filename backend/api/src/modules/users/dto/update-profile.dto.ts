@@ -15,7 +15,9 @@ export const UpdateProfileSchema = z
       .optional()
       .nullable(),
     avatarUrl: z.string().url('Must be a valid URL').max(2048).optional().nullable(),
+    dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'DOB must be YYYY-MM-DD').optional().nullable(),
+    whatsappConsent: z.boolean().optional(),
   })
-  .strict(); // Rejects extra keys like status, role, email, supabaseAuthId
+  .strict();
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;

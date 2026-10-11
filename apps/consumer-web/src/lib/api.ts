@@ -56,7 +56,13 @@ export class ApiClient extends CoreApiClient {
     return res.data;
   }
 
-  async updateUserProfile<T = any>(body: { name?: string; phone?: string; avatarUrl?: string }): Promise<T> {
+  async updateUserProfile<T = any>(body: {
+    name?: string;
+    phone?: string;
+    avatarUrl?: string;
+    dob?: string;
+    whatsappConsent?: boolean;
+  }): Promise<T> {
     const res = await this.patch<T>('/users/me', body);
     return res.data;
   }

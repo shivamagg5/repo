@@ -72,8 +72,33 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   avatarUrl: text('avatar_url'),
   status: userStatusEnum('status').notNull().default('active'),
+  phoneVerified: boolean('phone_verified').notNull().default(false),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  dob: text('dob'),
+  whatsappConsent: boolean('whatsapp_consent').notNull().default(false),
+  whatsappConsentUpdatedAt: timestamp('whatsapp_consent_updated_at', { withTimezone: true }),
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+  termsVersion: text('terms_version').default('1.0'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// OTP VERIFICATIONS
+// ---------------------------------------------------------------------------
+export const otpVerifications = pgTable('otp_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  destination: text('destination').notNull(),
+  destinationType: text('destination_type').notNull(),
+  purpose: text('purpose').notNull(),
+  otpHash: text('otp_hash').notNull(),
+  tokenHash: text('token_hash'),
+  attempts: integer('attempts').notNull().default(0),
+  maxAttempts: integer('max_attempts').notNull().default(5),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------

@@ -19,9 +19,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.BrightnessHigh
+import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.OfflinePin
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.*
@@ -36,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -248,31 +254,16 @@ private fun TicketPassContent(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Holographic Security Top Ribbon with Active Shimmer
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(PulsrPink, PulsrFlame, PulsrAcid, PulsrNeon, PulsrPink),
-                        startX = shimmerOffset,
-                        endX = shimmerOffset + 600f
-                    )
-                )
-        )
-
         // VIP Perforated Concert Pass
         Card(
             colors = CardDefaults.cardColors(containerColor = TicketBackground),
-            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .border(
                     1.dp,
                     TicketDivider,
-                    RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+                    RoundedCornerShape(20.dp)
                 )
         ) {
             Column(
@@ -325,13 +316,25 @@ private fun TicketPassContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "📍 ${ticket.event?.venue?.name ?: "Venue TBA"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OnSurfaceMedium,
-                            maxLines = 1,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.weight(1f)
-                        )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                tint = OnSurfaceMedium,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = ticket.event?.venue?.name ?: "Venue TBA",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurfaceMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = PulsrAcid.copy(alpha = 0.15f),
@@ -366,23 +369,40 @@ private fun TicketPassContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "⚡ ANTI-REPLAY PASS ACTIVE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PulsrNeon,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp,
-                            letterSpacing = 0.5.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(PulsrNeon))
+                            Text(
+                                text = "ANTI-REPLAY PASS ACTIVE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PulsrNeon,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
 
                         if (isOfflineCached) {
-                            Text(
-                                text = "📶 STORED OFFLINE",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PulsrAcid,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.OfflinePin,
+                                    contentDescription = null,
+                                    tint = PulsrAcid,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "STORED OFFLINE",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PulsrAcid,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -450,19 +470,29 @@ private fun TicketPassContent(
                             ),
                             modifier = Modifier
                                 .weight(1f)
+                                .height(42.dp)
                                 .clickable { onToggleBrightness() }
                         ) {
                             Row(
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    imageVector = if (isTorchBoostActive) Icons.Outlined.BrightnessHigh else Icons.Outlined.BrightnessMedium,
+                                    contentDescription = null,
+                                    tint = if (isTorchBoostActive) PulsrFlame else OnSurfaceMedium,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isTorchBoostActive) "☀️ 100% Boost: ON" else "🔅 Boost Brightness",
+                                    text = if (isTorchBoostActive) "100% Brightness" else "Boost Brightness",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isTorchBoostActive) PulsrFlame else OnSurfaceMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
+                                    fontSize = 11.sp
                                 )
                             }
                         }
@@ -477,19 +507,29 @@ private fun TicketPassContent(
                             ),
                             modifier = Modifier
                                 .weight(1f)
+                                .height(42.dp)
                                 .clickable { onSaveOffline() }
                         ) {
                             Row(
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    imageVector = if (isOfflineCached) Icons.Outlined.CloudDone else Icons.Outlined.Download,
+                                    contentDescription = null,
+                                    tint = if (isOfflineCached) PulsrAcid else OnSurfaceMedium,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isOfflineCached) "✓ Vault Secured" else "💾 Save Offline",
+                                    text = if (isOfflineCached) "Vault Secured" else "Save Offline",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isOfflineCached) PulsrAcid else OnSurfaceMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
+                                    fontSize = 11.sp
                                 )
                             }
                         }

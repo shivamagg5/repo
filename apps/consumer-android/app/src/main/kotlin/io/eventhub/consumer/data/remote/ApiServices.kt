@@ -160,6 +160,46 @@ class UserApiService @Inject constructor(private val client: HttpClient) {
     }
 }
 
+/**
+ * AuthApiService — unified canonical authentication endpoints.
+ */
+@Singleton
+class AuthApiService @Inject constructor(private val client: HttpClient) {
+
+    suspend fun sendOtp(phone: String, purpose: String = "SIGNUP"): SendOtpResponseDto =
+        client.apiPost("/auth/otp/send", SendOtpRequestDto(phone = phone, purpose = purpose))
+
+    suspend fun verifyOtp(phone: String, otp: String, purpose: String = "SIGNUP"): VerifyOtpResponseDto =
+        client.apiPost("/auth/otp/verify", VerifyOtpRequestDto(phone = phone, otp = otp, purpose = purpose))
+
+    suspend fun signup(request: SignupRequestDto): AuthResponseDto =
+        client.apiPost("/auth/signup", request)
+
+    suspend fun login(identifier: String, password: String): AuthResponseDto =
+        client.apiPost("/auth/login", LoginRequestDto(identifier = identifier, password = password))
+
+    suspend fun requestForgotPasswordOtp(identifier: String): ForgotPasswordRequestResponseDto =
+        client.apiPost("/auth/forgot-password/request", ForgotPasswordRequestDto(identifier = identifier))
+
+    suspend fun verifyForgotPasswordOtp(identifier: String, otp: String): ForgotPasswordVerifyResponseDto =
+        client.apiPost("/auth/forgot-password/verify", ForgotPasswordVerifyRequestDto(identifier = identifier, otp = otp))
+
+    suspend fun resetForgotPassword(resetToken: String, newPassword: String): SimpleMessageResponseDto =
+        client.apiPost("/auth/forgot-password/reset", ForgotPasswordResetRequestDto(resetToken = resetToken, newPassword = newPassword))
+
+    suspend fun resendConfirmationEmail(email: String? = null): SimpleMessageResponseDto =
+        client.apiPost("/auth/resend-confirmation-email", ResendConfirmationEmailRequestDto(email = email))
+
+    suspend fun changePhoneRequest(newPhone: String): SendOtpResponseDto =
+        client.apiPost("/auth/phone/change/request", ChangePhoneRequestDto(newPhone = newPhone))
+
+    suspend fun changePhoneVerify(newPhone: String, otp: String): SimpleMessageResponseDto =
+        client.apiPost("/auth/phone/change/verify", ChangePhoneVerifyDto(newPhone = newPhone, otp = otp))
+
+    suspend fun changePassword(currentPassword: String, newPassword: String): SimpleMessageResponseDto =
+        client.apiPost("/auth/password/change", ChangePasswordRequestDto(currentPassword = currentPassword, newPassword = newPassword))
+}
+
 // Simple category + city DTOs
 @Serializable
 data class CategoryDto(val id: String, val name: String, val iconUrl: String? = null)

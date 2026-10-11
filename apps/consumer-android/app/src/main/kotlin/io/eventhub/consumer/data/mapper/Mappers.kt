@@ -162,5 +162,11 @@ fun UserDto.toDomain(): User = User(
     name = name,
     avatarUrl = avatarUrl,
     phone = phone,
-    role = role
+    role = role,
+    phoneVerified = phoneVerified,
+    emailVerified = emailVerified,
+    dob = dob,
+    whatsappConsent = whatsappConsent,
+    termsAcceptedAt = termsAcceptedAt,
 )
+

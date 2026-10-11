@@ -60,6 +60,9 @@ export class UsersService {
         name: input.name ?? user.name,
         phone: input.phone !== undefined ? input.phone ?? null : user.phone,
         avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl ?? null : user.avatarUrl,
+        dob: input.dob !== undefined ? input.dob ?? null : user.dob,
+        whatsappConsent: input.whatsappConsent !== undefined ? input.whatsappConsent : user.whatsappConsent,
+        whatsappConsentUpdatedAt: input.whatsappConsent !== undefined ? new Date() : user.whatsappConsentUpdatedAt,
         updatedAt: new Date(),
         // NEVER update: supabaseAuthId, status, email
       })
@@ -178,6 +181,11 @@ export class UsersService {
       phone: user.phone ?? null,
       avatarUrl: user.avatarUrl ?? null,
       status: user.status,
+      phoneVerified: user.phoneVerified ?? false,
+      emailVerified: user.emailVerified ?? false,
+      dob: user.dob ?? null,
+      whatsappConsent: user.whatsappConsent ?? false,
+      termsAcceptedAt: user.termsAcceptedAt ? user.termsAcceptedAt.toISOString() : null,
       createdAt: user.createdAt.toISOString(),
     };
   }
