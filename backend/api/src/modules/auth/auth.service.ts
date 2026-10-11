@@ -122,7 +122,13 @@ export class AuthService implements OnModuleInit {
    * Phase 3: Complete Account Registration
    * Creates Supabase Auth user, public application profile, and initiates email confirmation.
    */
-  async signup(dto: SignupDto): Promise<{ user: UserProfile; message: string }> {
+  async signup(dto: SignupDto): Promise<{
+    user: UserProfile;
+    profile: UserProfile;
+    token: string;
+    refreshToken: string | null;
+    message: string;
+  }> {
     const normalizedPhone = this.normalizePhone(dto.phone);
     const normalizedEmail = dto.email.trim().toLowerCase();
 
@@ -225,8 +231,27 @@ export class AuthService implements OnModuleInit {
       },
     });
 
+    const profile = this.toProfile(created);
+    let sessionToken = '';
+    let refreshToken: string | null = null;
+    try {
+      const signInRes = await this.supabaseAnon.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: dto.password,
+      });
+      if (signInRes.data?.session) {
+        sessionToken = signInRes.data.session.access_token;
+        refreshToken = signInRes.data.session.refresh_token;
+      }
+    } catch (_err) {
+      // Ignored if email confirmation is required prior to login
+    }
+
     return {
-      user: this.toProfile(created),
+      token: sessionToken || 'signup_completed',
+      refreshToken,
+      user: profile,
+      profile,
       message: 'Account created successfully. Please check your email for the confirmation link.',
     };
   }
@@ -236,7 +261,13 @@ export class AuthService implements OnModuleInit {
    */
   async login(
     dto: LoginDto,
-  ): Promise<{ session: any; profile: UserProfile }> {
+  ): Promise<{
+    session: any;
+    profile: UserProfile;
+    user: UserProfile;
+    token: string;
+    refreshToken: string | null;
+  }> {
     const parsed = this.parseIdentifier(dto.identifier);
 
     // Locate canonical application user record
@@ -302,14 +333,21 @@ export class AuthService implements OnModuleInit {
       metadata: { identifierType: parsed.type },
     });
 
+    const profile = this.toProfile(updatedUser);
+    const token = data.session.access_token;
+    const refreshToken = data.session.refresh_token;
+
     return {
+      token,
+      refreshToken,
+      user: profile,
+      profile,
       session: {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
+        access_token: token,
+        refresh_token: refreshToken,
         expires_at: data.session.expires_at,
         token_type: data.session.token_type,
       },
-      profile: this.toProfile(updatedUser),
     };
   }
 

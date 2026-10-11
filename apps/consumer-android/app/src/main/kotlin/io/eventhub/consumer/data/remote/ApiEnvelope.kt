@@ -7,6 +7,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.delete
 import io.ktor.client.request.patch
+import io.ktor.client.statement.HttpResponse
 import kotlinx.serialization.Serializable
 
 // ─── API Envelope (matches backend: { data: T, meta: {} }) ─────────────────
@@ -39,6 +40,18 @@ data class PaginatedDataDto<T>(
 data class ApiMeta(val requestId: String? = null)
 
 @Serializable
+data class ApiErrorResponse(
+    val error: ApiErrorBody? = null,
+    val message: String? = null,
+)
+
+@Serializable
+data class ApiErrorBody(
+    val code: String? = null,
+    val message: String? = null,
+)
+
+@Serializable
 data class PaginationMeta(
     val page: Int = 1,
     val pageSize: Int = 25,
@@ -50,24 +63,53 @@ data class PaginationMeta(
 @PublishedApi
 internal fun formatPath(path: String): String = path.removePrefix("/")
 
-suspend inline fun <reified T> HttpClient.apiGet(path: String): T =
-    get(formatPath(path)).body<ApiEnvelope<T>>().data
+@PublishedApi
+internal suspend fun checkResponseStatus(response: HttpResponse) {
+    if (response.status.value >= 400) {
+        val errorText = try {
+            val errObj = response.body<ApiErrorResponse>()
+            errObj.error?.message ?: errObj.message ?: "Server error (${response.status.value})"
+        } catch (_: Exception) {
+            "Server error (${response.status.value})"
+        }
+        throw IllegalStateException(errorText)
+    }
+}
+
+suspend inline fun <reified T> HttpClient.apiGet(path: String): T {
+    val response = get(formatPath(path))
+    checkResponseStatus(response)
+    return response.body<ApiEnvelope<T>>().data
+}
 
 suspend inline fun <reified T> HttpClient.apiGetList(path: String): List<T> = try {
-    get(formatPath(path)).body<ApiListEnvelope<T>>().data
+    val response = get(formatPath(path))
+    checkResponseStatus(response)
+    response.body<ApiListEnvelope<T>>().data
 } catch (e: Exception) {
     try {
-        get(formatPath(path)).body<PaginatedFeedEnvelope<T>>().data.items
+        val response = get(formatPath(path))
+        checkResponseStatus(response)
+        response.body<PaginatedFeedEnvelope<T>>().data.items
     } catch (_: Exception) {
         throw e
     }
 }
 
-suspend inline fun <reified T> HttpClient.apiPost(path: String, body: Any? = null): T =
-    post(formatPath(path)) { if (body != null) setBody(body) }.body<ApiEnvelope<T>>().data
+suspend inline fun <reified T> HttpClient.apiPost(path: String, body: Any? = null): T {
+    val response = post(formatPath(path)) { if (body != null) setBody(body) }
+    checkResponseStatus(response)
+    return response.body<ApiEnvelope<T>>().data
+}
 
-suspend inline fun <reified T> HttpClient.apiPatch(path: String, body: Any): T =
-    patch(formatPath(path)) { setBody(body) }.body<ApiEnvelope<T>>().data
+suspend inline fun <reified T> HttpClient.apiPatch(path: String, body: Any): T {
+    val response = patch(formatPath(path)) { setBody(body) }
+    checkResponseStatus(response)
+    return response.body<ApiEnvelope<T>>().data
+}
 
-suspend fun HttpClient.apiDelete(path: String) = delete(formatPath(path))
+suspend fun HttpClient.apiDelete(path: String) {
+    val response = delete(formatPath(path))
+    checkResponseStatus(response)
+}
 
