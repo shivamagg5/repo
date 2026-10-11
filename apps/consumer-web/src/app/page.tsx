@@ -29,6 +29,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
+import { useAuth } from "@platform/auth";
 import { apiClient } from "../lib/api";
 
 const heroSinger = "/hero-singer.jpg";
@@ -201,6 +202,10 @@ function Counter({ to, suffix }: { to: number; suffix: string }) {
 
 export default function Index() {
   const router = useRouter();
+  const { status, profile, user, logout } = useAuth();
+  const isAuthed = status === 'authenticated';
+  const displayName = profile?.name || user?.user_metadata?.['name'] || user?.email?.split('@')[0] || 'User';
+
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -369,6 +374,43 @@ export default function Index() {
               <Bell className="size-4" />
             </Link>
 
+            {/* Auth Buttons / Profile Indicator */}
+            {status !== 'loading' && (
+              isAuthed ? (
+                <Link
+                  href="/tickets"
+                  className="hidden sm:inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3.5 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-card hover:border-pink-500/50"
+                >
+                  <span className="flex size-5 items-center justify-center rounded-full bg-pink-500 text-[10px] font-bold text-white">
+                    {displayName.charAt(0).toUpperCase()}
+                  </span>
+                  <span>{displayName.split(' ')[0]}</span>
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/auth/login"
+                    className="inline-flex items-center rounded-full border border-border bg-card/60 px-3.5 py-2 text-xs font-semibold text-foreground/90 transition-all hover:bg-card hover:text-white hover:border-pink-500/40"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="bg-hot inline-flex items-center rounded-full px-4 py-2 text-xs font-bold text-white shadow-md shadow-pink-900/30 transition-transform hover:scale-[1.03]"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )
+            )}
+
+            <Link
+              href="/events"
+              className="hidden md:inline-flex rounded-full border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 px-4 py-2 text-xs font-semibold text-pink-300 transition-colors"
+            >
+              Get tickets
+            </Link>
+
             <motion.button
               aria-label="Open menu"
               whileTap={{ scale: 0.9 }}
@@ -377,13 +419,6 @@ export default function Index() {
             >
               <Menu className="size-5" />
             </motion.button>
-
-            <Link
-              href="/events"
-              className="bg-hot hidden rounded-full px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.03] md:inline-flex"
-            >
-              Get tickets
-            </Link>
           </div>
         </div>
       </header>
@@ -393,10 +428,10 @@ export default function Index() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[80] bg-background/95 backdrop-blur-md md:hidden"
+          className="fixed inset-0 z-[80] bg-background/95 backdrop-blur-md md:hidden flex flex-col overflow-y-auto"
         >
-          <div className="flex items-center justify-between px-5 py-4">
-            <span className="font-display text-2xl tracking-wider text-muted-foreground">PULSR</span>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <span className="font-display text-2xl tracking-wider text-accent">✳ PULSR</span>
             <button
               aria-label="Close menu"
               onClick={() => setOpen(false)}
@@ -405,7 +440,7 @@ export default function Index() {
               <X className="size-5" />
             </button>
           </div>
-          <ul className="mt-6 space-y-2 px-4">
+          <ul className="mt-4 space-y-2 px-4 flex-1">
             {nav.map((n, i) => (
               <motion.li
                 key={n.label}
@@ -416,19 +451,60 @@ export default function Index() {
                 <Link
                   href={n.href}
                   onClick={() => setOpen(false)}
-                  className={`flex items-center justify-between rounded-2xl px-4 py-4 ${
+                  className={`flex items-center justify-between rounded-2xl px-4 py-3.5 ${
                     i === 0 ? "bg-primary text-primary-foreground" : "border-b border-border"
                   }`}
                 >
-                  <span className="flex items-center gap-3 font-display text-2xl tracking-wide">
+                  <span className="flex items-center gap-3 font-display text-xl tracking-wide">
                     <span className="text-xl">{n.icon}</span>
                     {n.label}
                   </span>
-                  <ArrowUpRight className="size-6" />
+                  <ArrowUpRight className="size-5" />
                 </Link>
               </motion.li>
             ))}
           </ul>
+
+          {/* Mobile Overlay Menu Auth Footer */}
+          <div className="p-4 border-t border-border mt-auto">
+            {isAuthed ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 px-2 py-1">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-pink-500 text-xs font-bold text-white">
+                    {displayName.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="text-xs">
+                    <div className="font-bold text-foreground">{displayName}</div>
+                    <div className="text-muted-foreground">{user?.email || 'Logged in'}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { logout(); setOpen(false); }}
+                  className="w-full flex items-center justify-center rounded-xl border border-red-900/40 bg-red-950/20 py-3 text-sm font-semibold text-red-300 hover:bg-red-950/40 transition-colors"
+                >
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Link
+                  href="/auth/login"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-center rounded-xl border border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-card/80 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  onClick={() => setOpen(false)}
+                  className="bg-hot flex items-center justify-center rounded-xl py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/40"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+          </div>
         </motion.div>
       )}
 

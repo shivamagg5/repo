@@ -142,12 +142,11 @@ export function Navbar() {
               </svg>
             </button>
 
-            {/* Auth Status (desktop) */}
+            {/* Auth Status (desktop & mobile) */}
             {status !== 'loading' && (
               isAuthed ? (
                 <Link
                   href="/tickets"
-                  className="hidden-mobile"
                   style={{
                     background: 'var(--surface-2)',
                     border: '1px solid var(--border)',
@@ -165,16 +164,43 @@ export function Navbar() {
                   <span style={{ fontSize: '11px', background: 'var(--pink)', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                     {displayName.charAt(0).toUpperCase()}
                   </span>
-                  {displayName.split(' ')[0]}
+                  <span className="hidden-mobile">{displayName.split(' ')[0]}</span>
                 </Link>
               ) : (
-                <Link
-                  href="/auth/login"
-                  className="hidden-mobile btn-neon"
-                  style={{ textDecoration: 'none', padding: '8px 20px' }}
-                >
-                  Sign In
-                </Link>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Link
+                    href="/auth/login"
+                    style={{
+                      textDecoration: 'none',
+                      padding: '7px 14px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: 'var(--text-1)',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '100px',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="btn-neon"
+                    style={{
+                      textDecoration: 'none',
+                      padding: '7px 16px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      borderRadius: '100px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    Sign Up
+                  </Link>
+                </div>
               )
             )}
 
@@ -379,7 +405,7 @@ export function Navbar() {
                   className="btn-ghost"
                   style={{ flex: 1, textDecoration: 'none', textAlign: 'center', justifyContent: 'center' }}
                 >
-                  Register
+                  Sign Up
                 </Link>
               </div>
             )}

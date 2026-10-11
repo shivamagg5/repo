@@ -1,192 +1,161 @@
+// =============================================================================
+// PULSR Consumer Web — Sign In Page
+// Unified design system: Identical container, ambient glow, typography, and
+// card framing as /auth/register and /auth/forgot-password.
+// =============================================================================
 'use client';
 
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@platform/auth';
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const rawRedirect = searchParams.get('redirectTo') || '/';
   const redirectTo = rawRedirect.startsWith('/auth') ? '/' : rawRedirect;
 
   const { login, loginAsDemo, loginWithGoogle, loginWithApple, error: authError, clearError } = useAuth();
 
-  const [identifier, setIdentifier] = useState('consumer1@staging.eventplatform.com');
-  const [password, setPassword] = useState('Consumer@12345');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError(null); clearError();
-    if (!identifier.trim() || !password) { setLocalError('Please fill in both fields.'); return; }
+    setLocalError(null);
+    clearError();
+
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      setLocalError('Please enter your email address or mobile number.');
+      return;
+    }
+    if (!password) {
+      setLocalError('Please enter your account password.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await login(identifier.trim(), password);
-      if (res.success) { window.location.href = redirectTo; }
-      else if (res.error) { setLocalError(res.error); }
-    } catch { setLocalError('Unexpected error. Try again.'); }
-    finally { setSubmitting(false); }
+      const res = await login(cleanId, password);
+      if (res.success) {
+        window.location.href = redirectTo;
+      } else if (res.error) {
+        setLocalError(res.error);
+      }
+    } catch {
+      setLocalError('Unexpected error during sign in. Please verify your credentials.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDemo = async () => {
-    setSubmitting(true); setLocalError(null);
+    setSubmitting(true);
+    setLocalError(null);
     try {
       const res = await loginAsDemo('consumer');
-      if (res.success) { window.location.href = redirectTo; }
-    } catch { setLocalError('Demo login failed.'); }
-    finally { setSubmitting(false); }
+      if (res.success) {
+        window.location.href = redirectTo;
+      }
+    } catch {
+      setLocalError('Demo attendee sign in failed. Please try with credentials.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const displayError = localError || authError;
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex',
-      background: 'var(--black)',
-    }}>
-      {/* Left panel — branding */}
-      <div style={{
-        flex: 1, display: 'none', position: 'relative',
-        background: 'var(--surface-1)',
-        borderRight: '1px solid var(--border)',
-        overflow: 'hidden', alignItems: 'flex-end', padding: '48px',
-      }} className="login-left-panel">
-        {/* BG gradient */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(255,31,109,0.2) 0%, rgba(8,8,8,0.8) 60%)',
-        }} />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h2 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2.5rem, 5vw, 5rem)',
-            lineHeight: 0.92, letterSpacing: '0.03em',
-            color: '#fff', marginBottom: '20px',
-          }}>
-            LIVE.<br/>LOUD.<br/><span style={{ color: 'var(--pink)' }}>LEGENDARY.</span>
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-2)', fontFamily: 'var(--font-body)', lineHeight: 1.6, maxWidth: '280px' }}>
-            Book tickets to the best live events in India. No bots. No fakes. Just real nights.
+    <div className="min-h-screen bg-[#090C15] text-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden font-['Inter']">
+      {/* Ambient background glows matching /auth/register */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-pink-600/15 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
+        {/* Branding Header */}
+        <div className="flex flex-col items-center justify-center gap-2 mb-6 text-center">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-pink-500 font-black text-2xl">✳</span>
+            <span className="font-extrabold text-xl tracking-wider text-white font-['Outfit']">PULSR</span>
+          </Link>
+          <h1 className="font-extrabold text-2xl tracking-tight text-white font-['Outfit'] mt-1">
+            Welcome Back
+          </h1>
+          <p className="text-xs text-slate-400">
+            Sign in to access your tickets, passes and radar
           </p>
         </div>
-      </div>
 
-      {/* Right panel — form */}
-      <div style={{
-        width: '100%', maxWidth: '480px', minHeight: '100vh',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '40px 32px',
-        background: 'var(--black)',
-      }}>
-        {/* Logo */}
-        <Link href="/" style={{ textDecoration: 'none', marginBottom: '40px', alignSelf: 'flex-start' }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--pink)', marginRight: '8px' }}>✳</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: '#fff', letterSpacing: '0.1em' }}>EVENTPLATFORM</span>
-        </Link>
-
-        <div style={{ width: '100%' }}>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2rem, 5vw, 3rem)',
-            lineHeight: 1, letterSpacing: '0.04em',
-            color: '#fff', marginBottom: '6px',
-          }}>
-            WELCOME BACK
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-2)', marginBottom: '32px', fontFamily: 'var(--font-body)' }}>
-            Sign in to manage your tickets and more.
-          </p>
-
-          {/* Demo button */}
-          <button
-            type="button"
-            onClick={handleDemo}
-            disabled={submitting}
-            className="btn-demo-pulse"
-            style={{
-              width: '100%',
-              background: 'var(--pink)',
-              border: 'none', borderRadius: '12px',
-              color: '#fff', padding: '14px 20px',
-              fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.7 : 1,
-              marginBottom: '20px',
-              letterSpacing: '0.03em',
-            }}
-          >
-            {submitting ? 'Loading…' : '🚀 Try Demo — 1 Click Access'}
-          </button>
-
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-body)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>or sign in</span>
-            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+        {/* Synchronized Segmented Switcher [ Sign In | Sign Up ] */}
+        <div className="flex bg-[#161B2E] p-1 rounded-2xl border border-slate-800 mb-6">
+          <div className="flex-1 py-2.5 text-center text-xs font-bold rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-900/40">
+            Sign In
           </div>
+          <Link
+            href={`/auth/register${redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
+            className="flex-1 py-2.5 text-center text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all"
+          >
+            Sign Up
+          </Link>
+        </div>
 
-          {/* Error */}
+        {/* Glass Card */}
+        <div className="bg-[#0F1424]/90 backdrop-blur-xl py-8 px-6 sm:px-8 shadow-2xl rounded-3xl border border-slate-800 space-y-6">
           {displayError && (
-            <div style={{
-              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: '10px', padding: '12px 14px',
-              fontSize: '13px', color: '#fc8181', marginBottom: '16px',
-              fontFamily: 'var(--font-body)',
-            }}>
-              ⚠️ {displayError}
+            <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{displayError}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', marginBottom: '8px', fontFamily: 'var(--font-body)' }}>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-2">
                 Email or Mobile Number
               </label>
               <input
                 type="text"
                 required
+                autoComplete="username"
                 value={identifier}
-                onChange={e => setIdentifier(e.target.value)}
-                placeholder="you@example.com or +91 98765 43210"
-                className="login-input"
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="name@domain.com or +919876543210"
+                className="w-full px-4 py-3 bg-[#161B2E] border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition-colors"
               />
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)', fontFamily: 'var(--font-body)' }}>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300">
                   Password
                 </label>
                 <Link
                   href="/auth/forgot-password"
-                  style={{ fontSize: '11px', color: 'var(--pink)', textDecoration: 'none', fontWeight: 600 }}
+                  className="text-[11px] text-pink-400 font-semibold hover:underline"
                 >
                   Forgot password?
                 </Link>
               </div>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="login-input"
-                  style={{ paddingRight: '48px', width: '100%' }}
+                  className="w-full px-4 py-3 pr-12 bg-[#161B2E] border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                    background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: '12px',
-                    cursor: 'pointer', padding: '4px',
-                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs px-1 py-0.5"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
@@ -196,72 +165,73 @@ function LoginForm() {
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                width: '100%',
-                background: 'var(--surface-2)',
-                border: '1.5px solid var(--border-strong)',
-                borderRadius: '12px', color: '#fff',
-                padding: '13px 20px',
-                fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 700,
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.7 : 1,
-                transition: 'background 150ms, border-color 150ms',
-                letterSpacing: '0.03em',
-              }}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-sm shadow-lg shadow-pink-950/40 transition-all disabled:opacity-50"
             >
               {submitting ? 'Signing in…' : 'Sign In →'}
             </button>
-          </form>
 
-          {/* Social */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
-            {[
-              { icon: 'G', label: 'Google', provider: 'google' as const },
-              { icon: '🍎', label: 'Apple', provider: 'apple' as const },
-            ].map(s => (
+            {/* Quick Demo Option */}
+            <button
+              type="button"
+              onClick={handleDemo}
+              disabled={submitting}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#161B2E]/70 hover:bg-[#161B2E] border border-slate-700/60 text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2"
+            >
+              <span>⚡</span> Try Demo Attendee (1-Click)
+            </button>
+
+            {/* Social Divider */}
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-slate-800" />
+              <span className="flex-shrink mx-4 text-slate-500 text-[10px] uppercase font-mono">
+                Or Social Access
+              </span>
+              <div className="flex-grow border-t border-slate-800" />
+            </div>
+
+            {/* Social Auth Buttons */}
+            <div className="grid grid-cols-2 gap-3">
               <button
-                key={s.provider}
                 type="button"
-                onClick={async () => { try { s.provider === 'google' ? await loginWithGoogle() : await loginWithApple(); } catch { setLocalError(`${s.label} login failed.`); } }}
-                style={{
-                  background: 'var(--surface-1)', border: '1px solid var(--border)',
-                  borderRadius: '10px', padding: '11px',
-                  fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 600,
-                  color: 'var(--text-2)', cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'border-color 150ms, color 150ms',
-                }}
+                onClick={() => loginWithGoogle()}
+                className="py-2.5 px-4 rounded-xl bg-[#161B2E] hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 transition-colors flex items-center justify-center gap-2"
               >
-                <span>{s.icon}</span> {s.label}
+                <span className="font-bold text-pink-400">G</span> Google
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => loginWithApple()}
+                className="py-2.5 px-4 rounded-xl bg-[#161B2E] hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>🍎</span> Apple
+              </button>
+            </div>
 
-          <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-2)', marginTop: '24px', fontFamily: 'var(--font-body)' }}>
-            No account?{' '}
-            <Link href="/auth/register" style={{ color: 'var(--pink)', fontWeight: 700, textDecoration: 'none' }}>
-              Sign up free →
-            </Link>
-          </p>
+            <p className="text-center text-xs text-slate-400 pt-2">
+              Don't have an account yet?{' '}
+              <Link
+                href={`/auth/register${redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
+                className="text-pink-400 font-bold hover:underline"
+              >
+                Sign up free →
+              </Link>
+            </p>
+          </form>
         </div>
       </div>
-
-      <style>{`
-        @media (min-width: 900px) {
-          .login-left-panel { display: flex !important; }
-        }
-      `}</style>
     </div>
   );
 }
 
 export default function ConsumerLoginPage() {
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-        Loading…
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#090C15] text-[#F8FAFC] flex items-center justify-center">
+          <div className="animate-pulse text-sm text-slate-400">Loading sign in…</div>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

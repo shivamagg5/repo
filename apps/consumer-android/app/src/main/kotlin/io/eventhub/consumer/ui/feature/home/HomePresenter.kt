@@ -22,6 +22,8 @@ import io.eventhub.consumer.ui.navigation.DiscoverRoute
 import io.eventhub.consumer.ui.navigation.EventDetailRoute
 import io.eventhub.consumer.ui.navigation.HomeRoute
 import io.eventhub.consumer.ui.navigation.NotificationsRoute
+import io.eventhub.consumer.domain.repository.AuthRepository
+import io.eventhub.consumer.ui.navigation.LoginRoute
 import io.eventhub.consumer.ui.navigation.SearchRoute
 import kotlinx.coroutines.launch
 
@@ -31,6 +33,7 @@ data class HomeState(
     val featuredEvents: List<Event> = emptyList(),
     val trendingEvents: List<Event> = emptyList(),
     val isLoading: Boolean = true,
+    val isAuthenticated: Boolean = false,
     val error: String? = null,
     val eventSink: (HomeEvent) -> Unit = {},
 ) : CircuitUiState
@@ -43,6 +46,7 @@ sealed interface HomeEvent : CircuitUiEvent {
     data object SearchClicked : HomeEvent
     data object NotificationsClicked : HomeEvent
     data object SeeAllTrendingClicked : HomeEvent
+    data object LoginClicked : HomeEvent
     data object RetryClicked : HomeEvent
 }
 
@@ -54,6 +58,7 @@ class HomePresenter @AssistedInject constructor(
     private val getFeaturedEvents: GetFeaturedEventsUseCase,
     private val getTrendingEvents: GetTrendingEventsUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase,
+    private val authRepository: AuthRepository,
 ) : Presenter<HomeState> {
 
     @Composable
@@ -61,6 +66,7 @@ class HomePresenter @AssistedInject constructor(
         var featured by remember { mutableStateOf<List<Event>>(emptyList()) }
         var trending by remember { mutableStateOf<List<Event>>(emptyList()) }
         var isLoading by remember { mutableStateOf(true) }
+        var isAuthenticated by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
 
@@ -69,6 +75,7 @@ class HomePresenter @AssistedInject constructor(
                 isLoading = true
                 error = null
                 try {
+                    isAuthenticated = authRepository.isAuthenticated()
                     featured = getFeaturedEvents()
                     trending = getTrendingEvents()
                 } catch (e: Exception) {
@@ -85,6 +92,7 @@ class HomePresenter @AssistedInject constructor(
             featuredEvents = featured,
             trendingEvents = trending,
             isLoading = isLoading,
+            isAuthenticated = isAuthenticated,
             error = error,
         ) { event ->
             when (event) {
@@ -104,6 +112,7 @@ class HomePresenter @AssistedInject constructor(
                 is HomeEvent.SearchClicked -> navigator.goTo(SearchRoute)
                 is HomeEvent.NotificationsClicked -> navigator.goTo(NotificationsRoute)
                 is HomeEvent.SeeAllTrendingClicked -> navigator.goTo(DiscoverRoute)
+                is HomeEvent.LoginClicked -> navigator.goTo(LoginRoute)
                 is HomeEvent.RetryClicked -> load()
             }
         }

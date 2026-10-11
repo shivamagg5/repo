@@ -228,6 +228,21 @@ function RegisterForm() {
           )}
         </div>
 
+        {/* Synchronized Segmented Switcher [ Sign In | Sign Up ] */}
+        {step === 'PHONE_EMAIL' && (
+          <div className="flex bg-[#161B2E] p-1 rounded-2xl border border-slate-800 mb-6">
+            <Link
+              href={`/auth/login${redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
+              className="flex-1 py-2.5 text-center text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all"
+            >
+              Sign In
+            </Link>
+            <div className="flex-1 py-2.5 text-center text-xs font-bold rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-900/40">
+              Sign Up
+            </div>
+          </div>
+        )}
+
         {/* Card */}
         <div className="bg-[#0F1424]/90 backdrop-blur-xl py-8 px-6 sm:px-8 shadow-2xl rounded-3xl border border-slate-800 space-y-6">
           {localError && (

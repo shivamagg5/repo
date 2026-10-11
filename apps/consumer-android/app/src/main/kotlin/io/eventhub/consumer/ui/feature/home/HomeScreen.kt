@@ -81,6 +81,8 @@ fun HomeScreen(state: HomeState, modifier: Modifier = Modifier) {
         topBar = {
             PulsrTopBar(
                 selectedCity = selectedCity,
+                isAuthenticated = state.isAuthenticated,
+                onLoginClick = { state.eventSink(HomeEvent.LoginClicked) },
                 onCityClick = { showCitySheet = true },
                 onSearchClick = { state.eventSink(HomeEvent.SearchClicked) },
                 onNotificationsClick = { state.eventSink(HomeEvent.NotificationsClicked) },
@@ -131,6 +133,8 @@ fun HomeScreen(state: HomeState, modifier: Modifier = Modifier) {
 @Composable
 private fun PulsrTopBar(
     selectedCity: String,
+    isAuthenticated: Boolean,
+    onLoginClick: () -> Unit,
     onCityClick: () -> Unit,
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -171,7 +175,7 @@ private fun PulsrTopBar(
             )
         }
 
-        // Actions: Location Pill + Bell
+        // Actions: Location Pill + Sign In / Account + Bell
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -205,6 +209,25 @@ private fun PulsrTopBar(
                     tint = OnSurfaceMedium,
                     modifier = Modifier.size(16.dp)
                 )
+            }
+
+            // Unauthenticated Guest CTA: Sign In button in Top Bar
+            if (!isAuthenticated) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(HotGradient)
+                        .clickable(onClick = onLoginClick)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Sign In",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             // Notification Bell with Neon Dot
@@ -307,6 +330,58 @@ private fun PulsrHomeContent(
                 event = heroEvent,
                 onClick = { heroEvent?.let { onEventClick(it.id) } }
             )
+        }
+
+        // Guest VIP Auth Banner
+        if (!state.isAuthenticated) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SurfaceDark)
+                        .border(1.dp, SurfaceBorder, RoundedCornerShape(16.dp))
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Welcome to PULSR",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = OnSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Sign in or create account to unlock tickets & drop radar",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurfaceMedium
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(HotGradient)
+                                .clickable { state.eventSink(HomeEvent.LoginClicked) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Sign In",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Category Filter Chips
